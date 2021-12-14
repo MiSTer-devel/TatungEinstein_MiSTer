@@ -185,10 +185,11 @@ assign VGA_SCALER = 0;
 assign HDMI_FREEZE = 0;
 
 assign AUDIO_S = 0;
-assign AUDIO_L = 0;
-assign AUDIO_R = 0;
+//assign AUDIO_L = 0;
+//assign AUDIO_R = 0;
 assign AUDIO_MIX = 0;
 
+assign LED_USER = 0;
 assign LED_DISK = 0;
 assign LED_POWER = 0;
 assign BUTTONS = 0;
@@ -202,26 +203,7 @@ assign VIDEO_ARY = (!ar) ? 12'd3 : 12'd0;
 
 `include "build_id.v" 
 localparam CONF_STR = {
-	"MyCore;;",
-	"-;",
-	"O89,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
-	"O2,TV Mode,NTSC,PAL;",
-	"O34,Noise,White,Red,Green,Blue;",
-	"-;",
-	"P1,Test Page 1;",
-	"P1-;",
-	"P1-, -= Options in page 1 =-;",
-	"P1-;",
-	"P1O5,Option 1-1,Off,On;",
-	"d0P1F1,BIN;",
-	"H0P1O6,Option 1-2,Off,On;",
-	"-;",
-	"P2,Test Page 2;",
-	"P2-;",
-	"P2-, -= Options in page 2 =-;",
-	"P2-;",
-	"P2S0,DSK;",
-	"P2O67,Option 2,1,2,3,4;",
+	"TatungEinstein;;",
 	"-;",
 	"-;",
 	"T0,Reset;",
@@ -253,56 +235,73 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 ///////////////////////   CLOCKS   ///////////////////////////////
 
 wire clk_sys;
+wire clk_vdp, clk_cpu;
 pll pll
 (
 	.refclk(CLK_50M),
 	.rst(0),
-	.outclk_0(clk_sys)
+	.outclk_0(clk_sys),
+	.outclk_1(clk_vdp),
+	.outclk_2(clk_cpu)
 );
 
 wire reset = RESET | status[0] | buttons[1];
 
 //////////////////////////////////////////////////////////////////
 
-wire [1:0] col = status[4:3];
+wire [7:0] kb_row;
+wire [7:0] kb_col;
+wire shift, ctrl, graph;
 
-wire HBlank;
-wire HSync;
-wire VBlank;
-wire VSync;
-wire ce_pix;
-wire [7:0] video;
-
-mycore mycore
-(
-	.clk(clk_sys),
-	.reset(reset),
-	
-	.pal(status[2]),
-	.scandouble(forced_scandoubler),
-
-	.ce_pix(ce_pix),
-
-	.HBlank(HBlank),
-	.HSync(HSync),
-	.VBlank(VBlank),
-	.VSync(VSync),
-
-	.video(video)
+keyboard keyboard(
+  .clk_sys(clk_sys),
+  .reset(reset),
+  .ps2_key(ps2_key),
+  .addr(kb_row),
+  .kb_cols(kb_col),
+  .modif({ ctrl, graph, shift })
+//   .shift(shift),
+//   .ctrl(ctrl),
+//   .graph(graph)
 );
 
-assign CLK_VIDEO = clk_sys;
+wire [9:0] sound;
+assign AUDIO_L = { sound, 5'd0 };
+assign AUDIO_R = { sound, 5'd0 };
+
+tatung tatung
+(
+	.clk_sys(clk_sys),
+	.clk_vdp(clk_vdp),
+	.clk_cpu(clk_cpu),
+	.reset(reset),
+
+	.vga_red(VGA_R),
+	.vga_green(VGA_G),
+	.vga_blue(VGA_B),
+	.vga_hblank(HBlank),
+	.vga_vblank(VBlank),
+	.vga_hsync(VGA_HS),
+	.vga_vsync(VGA_VS),
+	
+	.sound(sound),
+	
+	.kb_row(kb_row),
+	.kb_col(kb_col),
+	.kb_shift(shift),
+	.kb_ctrl(ctrl),
+	.kb_graph(graph)
+);
+
+wire HBlank;
+wire VBlank;
+
+assign CLK_VIDEO = clk_vdp;
 assign CE_PIXEL = ce_pix;
+assign VGA_DE = ~(HBlank|VBlank);
 
-assign VGA_DE = ~(HBlank | VBlank);
-assign VGA_HS = HSync;
-assign VGA_VS = VSync;
-assign VGA_G  = (!col || col == 2) ? video : 8'd0;
-assign VGA_R  = (!col || col == 1) ? video : 8'd0;
-assign VGA_B  = (!col || col == 3) ? video : 8'd0;
-
-reg  [26:0] act_cnt;
-always @(posedge clk_sys) act_cnt <= act_cnt + 1'd1; 
-assign LED_USER    = act_cnt[26]  ? act_cnt[25:18]  > act_cnt[7:0]  : act_cnt[25:18]  <= act_cnt[7:0];
+reg ce_pix;
+always @(posedge clk_vdp)
+	ce_pix <= ~ce_pix;
 
 endmodule
