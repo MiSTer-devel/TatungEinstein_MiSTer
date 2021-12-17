@@ -1,8 +1,9 @@
 
 module tatung(
-  input clk_sys,
+  input clk_sys, // 20
   input clk_cpu, // 4
   input clk_vdp, // 10.6875
+  input clk_fdc, // 8
   input reset,
 
   output [7:0] vga_red,
@@ -16,10 +17,27 @@ module tatung(
   output [9:0] sound,
 
   output [7:0] kb_row,
-  input  [7:0] kb_col,
-  input        kb_shift,
-  input        kb_ctrl,
-  input        kb_graph
+  input [7:0] kb_col,
+  input kb_shift,
+  input kb_ctrl,
+  input kb_graph,
+
+  input [1:0] img_mounted,
+  input [1:0] img_readonly,
+  input [31:0] img_size,
+
+  output [31:0] sd_lba,
+  output [1:0] sd_rd,
+  output [1:0] sd_wr,
+  input sd_ack,
+  input [8:0] sd_buff_addr,
+  input [7:0] sd_dout,
+  output [7:0] sd_din,
+  input sd_dout_strobe,
+
+  input diagnostic,
+  input border
+
 );
 
 wire [15:0] cpu_addr;
@@ -31,17 +49,20 @@ wire rd_n;
 wire wr_n;
 
 wire io_en = ~iorq_n & m1_n;
-wire rom_en = ~io_en && cpu_addr < 16'h8000 && ~I025a;
-wire ram_en = ~io_en && (cpu_addr >= 16'h8000 || I025a);
+wire rom_en = ~io_en && cpu_addr < 16'h8000 && ~I025a && ~rd_n;
+wire ram_en = ~io_en;
 
 // CPU data bus
 
 wire [7:0] cpu_din =
-  // ~KB_MSK_n & ~rd_n ? { kb_shift, kb_ctrl, kb_graph, 1'd1, 4'd0 } : // todo: add I036 (printer/fire)
   ~PSG_n & ~rd_n ? I030_dout :
   ~VDP_n & ~rd_n ? vdp_dout :
+  ~m1_n & ~iorq_n ? nz80v :
+  // ~KB_MSK_n & ~rd_n ? { kb_shift, kb_ctrl, kb_graph, 1'd1, 4'd0 } : // todo: add I036 (printer/fire)
+  ~FDC_n ? fdc_dout :
   ctc_doe ? ctc_dout :
-  rom_en ? rom_dout :
+  rom_a ? rom_a_dout :
+  rom_b ? rom_b_dout :
   ram_en ? ram_dout : 8'hff;
 
   
@@ -150,15 +171,15 @@ t80s t80s(
 
 // I/O enables
 
-wire ADC, PIO, CTC_n, I026_Y4, FDC, PCI, VDP_n, PSG_n;
-wire JR, MB, FIREINT_MSK, ROM_n, DR_SEL, APH, ADC_MSK, KB_MSK_n;
+wire ADC, PIO, CTC_n, I026_Y4, FDC_n, PCI, VDP_n, PSG_n;
+wire JR, MB, FIREINT_MSK, ROM_n, DRSEL_n, APH, ADC_MSK, KB_MSK_n;
 
 x74138 I026(
   .G1(~(iorq_n|~m1_n)),
   .G2A(cpu_addr[6]),
   .G2B(cpu_addr[7]),
   .A(cpu_addr[5:3]),
-  .Y({ ADC, PIO, CTC_n, I026_Y4, FDC, PCI, VDP_n, PSG_n })
+  .Y({ ADC, PIO, CTC_n, I026_Y4, FDC_n, PCI, VDP_n, PSG_n })
 );
 
 x74138 I027(
@@ -166,7 +187,7 @@ x74138 I027(
   .G2A(I026_Y4),
   .G2B(1'b0),
   .A(cpu_addr[2:0]),
-  .Y({ JR, MB, FIREINT_MSK, ROM_n, DR_SEL, APH, ADC_MSK, KB_MSK_n })
+  .Y({ JR, MB, FIREINT_MSK, ROM_n, DRSEL_n, APH, ADC_MSK, KB_MSK_n })
 );
 
 // ROM status toggler
@@ -182,14 +203,23 @@ always @(posedge ROM_n, posedge reset)
 // Memories
 
 	 
-wire [7:0] rom_dout;
+wire [7:0] rom_a_dout, rom_b_dout;
 
-rom16 I023(
+wire rom_a = rom_en && ~I025a && ~cpu_addr[14];
+wire rom_b = rom_en && ~I025a && cpu_addr[14] && diagnostic;
+
+rom #(.ROMFILE("roms/rom.mem"), .SIZE(16383)) I023(
   .clk(clk_sys),
-  .oe_n(~rom_en),
-  .cs_n(I025a),
+  .cs(~rom_a),
   .addr(cpu_addr[13:0]),
-  .q(rom_dout)
+  .q(rom_a_dout)
+);
+
+rom #(.ROMFILE("roms/diagnostic.mem"), .SIZE(1625)) I024(
+  .clk(clk_sys),
+  .cs(~rom_b),
+  .addr(cpu_addr[13:0]),
+  .q(rom_b_dout)
 );
 
 wire [7:0] ram_dout;
@@ -239,7 +269,7 @@ vdp18_core vdp18(
   .vram_d_o(vram_din),
   .vram_d_i(vram_dout),
 
-  .border_i(),
+  .border_i(border),
   .col_o(),
   .rgb_r_o(vga_red),
   .rgb_g_o(vga_green),
@@ -257,8 +287,10 @@ vdp18_core vdp18(
 
 wire [7:0] I030_dout;
 
+wire soft_reset = ~(~(PSG_n|cpu_addr[1]) | reset);
+
 jt49_bus I030(
-  .rst_n(~reset),
+  .rst_n(soft_reset),
   .clk(clk_sys),
   .clk_en(cen_2),
   .bdir(~(PSG_n|wr_n)),
@@ -271,13 +303,13 @@ jt49_bus I030(
   .B(),
   .C(),
   .sample(),
-  .IOA_in(),
+  .IOA_in(8'hff),
   .IOA_out(kb_row),
   .IOB_in(kb_col),
   .IOB_out()
 );
 
-// CTC
+// CTC - Timer
 
 wire [3:0] zc_to;
 wire ctc_int_n;
@@ -320,5 +352,110 @@ z80ctc ctc(
   .I_TI({ zc_to[2], {3{clk_2}} }),
   .O_TO(zc_to)
 );
+
+
+// FDC - disk controller
+
+reg [3:0] I043_q; // drive-select
+wire [7:0] fdc_dout;
+reg [7:0] fdc_motor_countdown;
+reg [1:0] fdc_motor_state;
+reg fdc_motor_on;
+wire floppy_select_write = ~wr_n & ~FDC_n;
+wire fdc_new_command;
+
+always @(posedge clk_sys)
+  if (~DRSEL_n && ~wr_n) I043_q <= ~cpu_dout;
+
+// Motor controller state machine for auto spinup and spin down from TRS-80
+
+reg [7:0] fdc_clk_div = 8'd1;
+reg [18:0] div;
+reg cen_25ms;
+always @(posedge clk_sys) begin
+  cen_25ms <= 1'b0;
+  if (div == 0) begin
+    div <= 19'd500000;
+    cen_25ms <= 1'b1;
+  end
+  else begin
+    div <= div - 18'd1;
+  end
+end
+
+always @(posedge clk_sys) begin
+  if (reset) begin
+		fdc_motor_state <= 2'b0;
+		fdc_motor_countdown <= 8'd0;
+		fdc_motor_on <= 1'b0;
+  end
+  else begin
+    case (fdc_motor_state)
+      2'd0: begin // stopped
+        fdc_motor_on <= 1'b0;
+        if (floppy_select_write) begin
+          fdc_motor_state <= 1'b1;
+          fdc_motor_countdown <= 8'd20 / fdc_clk_div;
+        end
+      end
+      2'd1: begin // spinup
+        if (fdc_motor_countdown == 8'd0) begin
+          fdc_motor_state <= 2'd2;
+          fdc_motor_countdown <= 8'd120 / fdc_clk_div;
+          fdc_motor_on <= 1'b1;
+        end
+        else begin
+          if (cen_25ms) fdc_motor_countdown <= fdc_motor_countdown - 1;
+        end
+      end
+      2'd2: begin // running
+        if (fdc_motor_countdown == 8'd0) begin
+          fdc_motor_state <= 2'd0;
+          fdc_motor_on <= 1'b0;
+        end
+        else begin
+          if (floppy_select_write || fdc_new_command) begin
+            fdc_motor_countdown <= 8'd120 / fdc_clk_div;
+          end
+          else begin
+            if (cen_25ms) fdc_motor_countdown <= fdc_motor_countdown - 1;
+          end
+        end
+      end
+    endcase
+  end
+end
+
+
+fdc1771 fdc(
+  .clk_sys(clk_sys),
+  .clk_cpu(clk_cpu),
+  .clk_div(fdc_clk_div),
+  .floppy_drive(I043_q),
+  .floppy_side(1'b1),
+  .floppy_reset(soft_reset),
+  .motor_on(fdc_motor_on),
+  .irq(),
+  .drq(),
+  .cpu_addr(cpu_addr[1:0]),
+  .cpu_sel(~FDC_n),
+  .cpu_rd(rd_n),
+  .cpu_wr(wr_n),
+  .cpu_din(cpu_dout),
+  .cpu_dout(fdc_dout),
+  .img_mounted(img_mounted),
+  .img_wp(img_readonly),
+  .img_size(img_size),
+  .sd_lba(sd_lba),
+  .sd_rd(sd_rd),
+  .sd_wr(sd_wr),
+  .sd_ack(sd_ack),
+  .sd_buff_addr(sd_buff_addr),
+  .sd_dout(sd_dout),
+  .sd_din(sd_din),
+  .sd_dout_strobe(sd_dout_strobe),
+  .fdc_new_command(fdc_new_command)
+);
+
 
 endmodule

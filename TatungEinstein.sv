@@ -204,7 +204,13 @@ assign VIDEO_ARY = (!ar) ? 12'd3 : 12'd0;
 `include "build_id.v" 
 localparam CONF_STR = {
 	"TatungEinstein;;",
+	"S0,DSK,Mount Disk 0:;",
+ 	"S1,DSK,Mount Disk 1:;",
 	"-;",
+	"H0O89,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
+	"-;",
+	"O6,Diagnostic ROM mounted,Off,On;",
+	"O7,Border,Off,On;",
 	"-;",
 	"T0,Reset;",
 	"R0,Reset and close OSD;",
@@ -215,6 +221,17 @@ wire forced_scandoubler;
 wire  [1:0] buttons;
 wire [31:0] status;
 wire [10:0] ps2_key;
+wire [31:0] sd_lba;
+wire  [1:0] sd_rd;
+wire  [1:0] sd_wr;
+wire        sd_ack;
+wire  [8:0] sd_buff_addr;
+wire  [7:0] sd_buff_dout;
+wire  [7:0] sd_buff_din;
+wire        sd_buff_wr;
+wire  [1:0] img_mounted;
+wire        img_readonly;
+wire [63:0] img_size;
 
 hps_io #(.CONF_STR(CONF_STR)) hps_io
 (
@@ -229,20 +246,35 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 	.status(status),
 	.status_menumask({status[5]}),
 	
-	.ps2_key(ps2_key)
+	.ps2_key(ps2_key),
+
+
+	.sd_lba('{sd_lba}),
+	.sd_rd(sd_rd),
+	.sd_wr(sd_wr),
+	.sd_ack(sd_ack),
+	.sd_buff_addr(sd_buff_addr),
+	.sd_buff_dout(sd_buff_dout),
+	.sd_buff_din('{sd_buff_din}),
+	.sd_buff_wr(sd_buff_wr),
+
+	.img_mounted(img_mounted),
+	.img_readonly(img_readonly),
+	.img_size(img_size)
 );
 
 ///////////////////////   CLOCKS   ///////////////////////////////
 
 wire clk_sys;
-wire clk_vdp, clk_cpu;
+wire clk_vdp, clk_cpu, clk_fdc;
 pll pll
 (
 	.refclk(CLK_50M),
 	.rst(0),
 	.outclk_0(clk_sys),
 	.outclk_1(clk_vdp),
-	.outclk_2(clk_cpu)
+	.outclk_2(clk_cpu),
+	.outclk_3(clk_fdc)
 );
 
 wire reset = RESET | status[0] | buttons[1];
@@ -260,9 +292,6 @@ keyboard keyboard(
   .addr(kb_row),
   .kb_cols(kb_col),
   .modif({ ctrl, graph, shift })
-//   .shift(shift),
-//   .ctrl(ctrl),
-//   .graph(graph)
 );
 
 wire [9:0] sound;
@@ -274,6 +303,7 @@ tatung tatung
 	.clk_sys(clk_sys),
 	.clk_vdp(clk_vdp),
 	.clk_cpu(clk_cpu),
+	.clk_fdc(clk_fdc),
 	.reset(reset),
 
 	.vga_red(VGA_R),
@@ -290,7 +320,23 @@ tatung tatung
 	.kb_col(kb_col),
 	.kb_shift(shift),
 	.kb_ctrl(ctrl),
-	.kb_graph(graph)
+	.kb_graph(graph),
+
+	.img_mounted(img_mounted),
+	.img_readonly(img_readonly),
+	.img_size(img_size),
+
+	.sd_lba(sd_lba),
+	.sd_rd(sd_rd),
+	.sd_wr(sd_wr),
+	.sd_ack(sd_ack),
+	.sd_buff_addr(sd_buff_addr),
+	.sd_dout(sd_buff_dout),
+	.sd_din(sd_buff_din),
+	.sd_dout_strobe(sd_buff_wr),
+
+	.diagnostic(status[6]),
+	.border(status[7])
 );
 
 wire HBlank;
