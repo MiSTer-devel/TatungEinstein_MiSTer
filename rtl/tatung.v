@@ -58,8 +58,8 @@ wire [7:0] cpu_din =
   ~PSG_n & ~rd_n ? I030_dout :
   ~VDP_n & ~rd_n ? vdp_dout :
   ~m1_n & ~iorq_n ? nz80v :
-  // ~KB_MSK_n & ~rd_n ? { kb_shift, kb_ctrl, kb_graph, 1'd1, 4'd0 } : // todo: add I036 (printer/fire)
-  ~FDC_n ? fdc_dout :
+//  ~KB_MSK_n & ~rd_n ? { kb_shift, kb_ctrl, kb_graph, 1'd1, 4'd0 } : // todo: add I036 (printer/fire)
+  ~FDC_n & ~rd_n ? fdc_dout :
   ctc_doe ? ctc_dout :
   rom_a ? rom_a_dout :
   rom_b ? rom_b_dout :
@@ -358,89 +358,22 @@ z80ctc ctc(
 
 reg [3:0] I043_q; // drive-select
 wire [7:0] fdc_dout;
-reg [7:0] fdc_motor_countdown;
-reg [1:0] fdc_motor_state;
-reg fdc_motor_on;
-wire floppy_select_write = ~wr_n & ~FDC_n;
-wire fdc_new_command;
 
 always @(posedge clk_sys)
-  if (~DRSEL_n && ~wr_n) I043_q <= ~cpu_dout;
-
-// Motor controller state machine for auto spinup and spin down from TRS-80
-
-reg [7:0] fdc_clk_div = 8'd1;
-reg [18:0] div;
-reg cen_25ms;
-always @(posedge clk_sys) begin
-  cen_25ms <= 1'b0;
-  if (div == 0) begin
-    div <= 19'd500000;
-    cen_25ms <= 1'b1;
-  end
-  else begin
-    div <= div - 18'd1;
-  end
-end
-
-always @(posedge clk_sys) begin
-  if (reset) begin
-		fdc_motor_state <= 2'b0;
-		fdc_motor_countdown <= 8'd0;
-		fdc_motor_on <= 1'b0;
-  end
-  else begin
-    case (fdc_motor_state)
-      2'd0: begin // stopped
-        fdc_motor_on <= 1'b0;
-        if (floppy_select_write) begin
-          fdc_motor_state <= 1'b1;
-          fdc_motor_countdown <= 8'd20 / fdc_clk_div;
-        end
-      end
-      2'd1: begin // spinup
-        if (fdc_motor_countdown == 8'd0) begin
-          fdc_motor_state <= 2'd2;
-          fdc_motor_countdown <= 8'd120 / fdc_clk_div;
-          fdc_motor_on <= 1'b1;
-        end
-        else begin
-          if (cen_25ms) fdc_motor_countdown <= fdc_motor_countdown - 1;
-        end
-      end
-      2'd2: begin // running
-        if (fdc_motor_countdown == 8'd0) begin
-          fdc_motor_state <= 2'd0;
-          fdc_motor_on <= 1'b0;
-        end
-        else begin
-          if (floppy_select_write || fdc_new_command) begin
-            fdc_motor_countdown <= 8'd120 / fdc_clk_div;
-          end
-          else begin
-            if (cen_25ms) fdc_motor_countdown <= fdc_motor_countdown - 1;
-          end
-        end
-      end
-    endcase
-  end
-end
+  if (~DRSEL_n && ~wr_n) I043_q <= ~cpu_dout[3:0];
 
 
-fdc1771 fdc(
-  .clk_sys(clk_sys),
-  .clk_cpu(clk_cpu),
-  .clk_div(fdc_clk_div),
+fdc1772 fdc(
+  .clkcpu(clk_sys),
+  .clk8m_en(clk_fdc),
   .floppy_drive(I043_q),
-  .floppy_side(1'b1),
+  .floppy_side(1'b0),
   .floppy_reset(soft_reset),
-  .motor_on(fdc_motor_on),
   .irq(),
   .drq(),
   .cpu_addr(cpu_addr[1:0]),
   .cpu_sel(~FDC_n),
-  .cpu_rd(rd_n),
-  .cpu_wr(wr_n),
+  .cpu_rw(wr_n),
   .cpu_din(cpu_dout),
   .cpu_dout(fdc_dout),
   .img_mounted(img_mounted),
@@ -453,8 +386,7 @@ fdc1771 fdc(
   .sd_buff_addr(sd_buff_addr),
   .sd_dout(sd_dout),
   .sd_din(sd_din),
-  .sd_dout_strobe(sd_dout_strobe),
-  .fdc_new_command(fdc_new_command)
+  .sd_dout_strobe(sd_dout_strobe)
 );
 
 

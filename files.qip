@@ -26,4 +26,4 @@ set_global_assignment -name VHDL_FILE rtl/vdp18/vdp18_hor_vert.vhd
 set_global_assignment -name VHDL_FILE rtl/vdp18/vdp18_addr_mux.vhd
 set_global_assignment -name VHDL_FILE rtl/vdp18/vdp18_core.vhd
 
-set_global_assignment -name QIP_FILE rtl/fdc/fdc1771.qip
+set_global_assignment -name QIP_FILE rtl/fdc/fdc1772.qip

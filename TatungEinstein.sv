@@ -266,18 +266,31 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 ///////////////////////   CLOCKS   ///////////////////////////////
 
 wire clk_sys;
-wire clk_vdp, clk_cpu, clk_fdc;
+wire clk_vdp, clk_cpu;//, clk_fdc;
 pll pll
 (
 	.refclk(CLK_50M),
 	.rst(0),
-	.outclk_0(clk_sys),
-	.outclk_1(clk_vdp),
-	.outclk_2(clk_cpu),
-	.outclk_3(clk_fdc)
+	.outclk_0(clk_sys), // 40
+	.outclk_1(clk_vdp), // 10
+	.outclk_2(clk_cpu)  // 4
 );
 
 wire reset = RESET | status[0] | buttons[1];
+
+reg [2:0] fdc_div; // 8M cen
+reg clk_fdc;
+always @(posedge clk_sys) begin
+	if (fdc_div == 3'd4) begin
+		fdc_div <= 3'd0;
+		clk_fdc <= 1'b1;
+	end
+	else begin
+		fdc_div <= fdc_div + 3'd1;
+		clk_fdc <= 1'b0;
+	end
+end
+
 
 //////////////////////////////////////////////////////////////////
 
