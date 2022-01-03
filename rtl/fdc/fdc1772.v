@@ -188,7 +188,7 @@ always @(*) begin
 
 		image_spt = 5'd10;
 		if (image_hd) image_spt = image_spt << 1'b1;
-		image_gap_len = 10'd10;
+		image_gap_len = 10'd6;
 	end
 	default: begin
 		sector_size_code = 2'd0;
