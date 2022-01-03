@@ -69,8 +69,9 @@ localparam IMG_ARCHIE      = 0;
 localparam IMG_ST          = 1;
 localparam IMG_BBC         = 2; // SSD, DSD formats
 localparam IMG_TI99        = 3; // V9T9 format
+localparam IMG_TATUNG      = 4;
 
-parameter  IMG_TYPE        = IMG_BBC;
+parameter  IMG_TYPE        = IMG_TATUNG;
 
 localparam W    = FD_NUM - 1;
 localparam WIDX = $clog2(FD_NUM);
@@ -168,6 +169,26 @@ always @(*) begin
 		else
 			image_sps = image_sectors;
 		image_gap_len = 10'd50;
+	end
+	IMG_TATUNG: begin
+		// 512 bytes/sector
+		sector_size_code = 2'd2;
+		sector_base = 1;
+		sd_lba = ((fd_spt*track[6:0]) << fd_doubleside) + (floppy_side ? 5'd0 : fd_spt) + sector[4:0] - 1'd1;
+
+		image_fm = 0;
+		image_sectors = img_size[20:9];
+		image_doubleside = 1'b0;
+		image_sps = image_sectors;
+		if (image_sectors > (85*12)) begin
+			image_doubleside = 1'b1;
+			image_sps = image_sectors >> 1'b1;
+		end
+		if (image_hd) image_sps = image_sps >> 1'b1;
+
+		image_spt = 5'd10;
+		if (image_hd) image_spt = image_spt << 1'b1;
+		image_gap_len = 10'd10;
 	end
 	default: begin
 		sector_size_code = 2'd0;

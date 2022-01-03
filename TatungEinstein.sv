@@ -235,7 +235,7 @@ wire [63:0] img_size;
 
 hps_io #(.CONF_STR(CONF_STR)) hps_io
 (
-	.clk_sys(clk_sys),
+	.clk_sys(clk_cpu),
 	.HPS_BUS(HPS_BUS),
 	.EXT_BUS(),
 	.gamma_bus(),
@@ -266,31 +266,30 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 ///////////////////////   CLOCKS   ///////////////////////////////
 
 wire clk_sys;
-wire clk_vdp, clk_cpu;//, clk_fdc;
+wire clk_vdp;
 pll pll
 (
 	.refclk(CLK_50M),
 	.rst(0),
 	.outclk_0(clk_sys), // 40
-	.outclk_1(clk_vdp), // 10
-	.outclk_2(clk_cpu)  // 4
+	.outclk_1(clk_vdp)  // 10
 );
 
 wire reset = RESET | status[0] | buttons[1];
 
-reg [2:0] fdc_div; // 8M cen
-reg clk_fdc;
+reg [2:0] clk_div; // 8M cen
+reg clk_fdc, clk_cpu;
 always @(posedge clk_sys) begin
-	if (fdc_div == 3'd4) begin
-		fdc_div <= 3'd0;
+	if (clk_div == 3'd4) begin
+		clk_cpu <= ~clk_cpu;
 		clk_fdc <= 1'b1;
+		clk_div <= 3'd0;
 	end
 	else begin
-		fdc_div <= fdc_div + 3'd1;
 		clk_fdc <= 1'b0;
+		clk_div <= clk_div + 3'd1;
 	end
 end
-
 
 //////////////////////////////////////////////////////////////////
 
@@ -342,7 +341,7 @@ tatung tatung
 	.sd_lba(sd_lba),
 	.sd_rd(sd_rd),
 	.sd_wr(sd_wr),
-	.sd_ack(sd_ack),
+	.sd_ack(|sd_ack),
 	.sd_buff_addr(sd_buff_addr),
 	.sd_dout(sd_buff_dout),
 	.sd_din(sd_buff_din),

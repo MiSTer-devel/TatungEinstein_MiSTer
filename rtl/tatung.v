@@ -1,8 +1,8 @@
 
 module tatung(
-  input clk_sys, // 20
+  input clk_sys, // 40
   input clk_cpu, // 4
-  input clk_vdp, // 10.6875
+  input clk_vdp, // 10
   input clk_fdc, // 8
   input reset,
 
@@ -107,17 +107,17 @@ end
 wire int_n = ctc_int_n & kb_int_n;// 1'b1;//kb_int_n & ctc_int_n;
 
 
-// clocks & enables
+// 2M clock & enable
 
-reg [3:0] clk_cnt;
+reg [4:0] clk_cnt;
 reg clk_2, cen_2;
 always @(posedge clk_cpu)
 	clk_2 <= ~clk_2;
 
 always @(posedge clk_sys)
-  if (clk_cnt == 4'd9) begin
+  if (clk_cnt == 5'd19) begin
     cen_2 <= 1'b1;
-    clk_cnt <= 4'd0;
+    clk_cnt <= 5'd0;
   end
   else begin
     cen_2 <= 1'b0;
@@ -355,19 +355,21 @@ z80ctc ctc(
 
 
 // FDC - disk controller
+// DSD, 40 tracks on each side.
+// 1 track = 10 sectors of 512 bytes.
 
 reg [3:0] I043_q; // drive-select
+reg floppy_side;
 wire [7:0] fdc_dout;
 
 always @(posedge clk_sys)
-  if (~DRSEL_n && ~wr_n) I043_q <= ~cpu_dout[3:0];
-
+  if (~DRSEL_n && ~wr_n) { floppy_side, I043_q } <= ~cpu_dout[4:0];
 
 fdc1772 fdc(
-  .clkcpu(clk_sys),
+  .clkcpu(clk_cpu),
   .clk8m_en(clk_fdc),
   .floppy_drive(I043_q),
-  .floppy_side(1'b0),
+  .floppy_side(~floppy_side),
   .floppy_reset(soft_reset),
   .irq(),
   .drq(),
