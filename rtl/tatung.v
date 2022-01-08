@@ -1,9 +1,9 @@
 
 module tatung(
-  input clk_sys, // 40
+  input clk_sys, // 32
   input clk_cpu, // 4
   input clk_vdp, // 10
-  input clk_fdc, // 8
+  input clk_fdc, // cen 4
   input reset,
 
   output [7:0] vga_red,
@@ -109,20 +109,23 @@ wire int_n = ctc_int_n & kb_int_n;// 1'b1;//kb_int_n & ctc_int_n;
 
 // 2M clock & enable
 
-reg [4:0] clk_cnt;
-reg clk_2, cen_2;
-always @(posedge clk_cpu)
-	clk_2 <= ~clk_2;
+reg [3:0] clk_cnt;
+wire clk_2 = clk_cnt[3];
+wire cen_2 = clk_cnt == 4'b1111;
+always @(posedge clk_sys) clk_cnt <= clk_cnt + 4'd1;
 
-always @(posedge clk_sys)
-  if (clk_cnt == 5'd19) begin
-    cen_2 <= 1'b1;
-    clk_cnt <= 5'd0;
-  end
-  else begin
-    cen_2 <= 1'b0;
-    clk_cnt <= clk_cnt + 4'd1;
-  end
+//always @(posedge clk_sys) begin
+//  cen_2 <= 1'b0;
+//  clk_cnt <= clk_cnt + 4'd1;
+//  if (clk_cnt == 5'd19) begin
+//    cen_2 <= 1'b1;
+//	 clk_2 <= 1'b1;
+//    clk_cnt <= 5'd0;
+//  end
+//  else if (clk_cnt == 5'd9) begin
+//    clk_2 <= 1'b0;
+//  end
+//end
 
 // CPU
 
@@ -357,6 +360,7 @@ z80ctc ctc(
 // FDC - disk controller
 // DSD, 40 tracks on each side.
 // 1 track = 10 sectors of 512 bytes.
+// 
 
 reg [3:0] I043_q; // drive-select
 reg floppy_side;
@@ -365,31 +369,65 @@ wire [7:0] fdc_dout;
 always @(posedge clk_sys)
   if (~DRSEL_n && ~wr_n) { floppy_side, I043_q } <= ~cpu_dout[4:0];
 
-fdc1772 fdc(
-  .clkcpu(clk_cpu),
-  .clk8m_en(clk_fdc),
-  .floppy_drive(I043_q),
-  .floppy_side(~floppy_side),
-  .floppy_reset(soft_reset),
-  .irq(),
+// fdc1772 fdc(
+//   .clkcpu(clk_sys),
+//   .clk8m_en(clk_fdc),
+//   .floppy_drive(I043_q),
+//   .floppy_side(~floppy_side),
+//   .floppy_reset(soft_reset),
+//   .irq(),
+//   .drq(),
+//   .cpu_addr(cpu_addr[1:0]),
+//   .cpu_sel(~FDC_n),
+//   .cpu_rw(wr_n),
+//   .cpu_din(cpu_dout),
+//   .cpu_dout(fdc_dout),
+//   .img_mounted(img_mounted),
+//   .img_wp(img_readonly),
+//   .img_size(img_size),
+//   .sd_lba(sd_lba),
+//   .sd_rd(sd_rd),
+//   .sd_wr(sd_wr),
+//   .sd_ack(sd_ack),
+//   .sd_buff_addr(sd_buff_addr),
+//   .sd_dout(sd_dout),
+//   .sd_din(sd_din),
+//   .sd_dout_strobe(sd_dout_strobe)
+// );
+
+reg fdd_ready = 0;
+always @(posedge clk_sys)
+  if (img_mounted) fdd_ready <= |img_size;
+
+wd1793 #(.RWMODE(1), .EDSK(1)) fdc(
+  .clk_sys(clk_sys),
+  .ce(clk_fdc),
+  .reset(~soft_reset),
+  .io_en(~FDC_n),
+  .rd(~rd_n),
+  .wr(~wr_n),
+  .addr(cpu_addr[1:0]),
+  .din(cpu_dout),
+  .dout(fdc_dout),
   .drq(),
-  .cpu_addr(cpu_addr[1:0]),
-  .cpu_sel(~FDC_n),
-  .cpu_rw(wr_n),
-  .cpu_din(cpu_dout),
-  .cpu_dout(fdc_dout),
+  .intrq(),
+  .busy(),
+  .wp(img_readonly),
+  .size_code(3'b100),
+  .layout(0),
+  .side(~floppy_side),
+  .ready(fdd_ready),
   .img_mounted(img_mounted),
-  .img_wp(img_readonly),
   .img_size(img_size),
+  .prepare(),
   .sd_lba(sd_lba),
   .sd_rd(sd_rd),
   .sd_wr(sd_wr),
   .sd_ack(sd_ack),
   .sd_buff_addr(sd_buff_addr),
-  .sd_dout(sd_dout),
-  .sd_din(sd_din),
-  .sd_dout_strobe(sd_dout_strobe)
+  .sd_buff_dout(sd_dout),
+  .sd_buff_din(sd_din),
+  .sd_buff_wr(sd_dout_strobe)
 );
-
 
 endmodule

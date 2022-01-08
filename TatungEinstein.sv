@@ -235,7 +235,7 @@ wire [63:0] img_size;
 
 hps_io #(.CONF_STR(CONF_STR)) hps_io
 (
-	.clk_sys(clk_cpu),
+	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
 	.EXT_BUS(),
 	.gamma_bus(),
@@ -271,25 +271,17 @@ pll pll
 (
 	.refclk(CLK_50M),
 	.rst(0),
-	.outclk_0(clk_sys), // 40
+	.outclk_0(clk_sys), // 32
 	.outclk_1(clk_vdp)  // 10
 );
 
 wire reset = RESET | status[0] | buttons[1];
 
-reg [2:0] clk_div; // 8M cen
-reg clk_fdc, clk_cpu;
-always @(posedge clk_sys) begin
-	if (clk_div == 3'd4) begin
-		clk_cpu <= ~clk_cpu;
-		clk_fdc <= 1'b1;
-		clk_div <= 3'd0;
-	end
-	else begin
-		clk_fdc <= 1'b0;
-		clk_div <= clk_div + 3'd1;
-	end
-end
+reg [2:0] clk_div;
+wire clk_cpu = clk_div[2]; // 4M
+wire clk_fdc = clk_div == 3'b111;
+always @(posedge clk_sys) clk_div <= clk_div + 3'd1;
+
 
 //////////////////////////////////////////////////////////////////
 
