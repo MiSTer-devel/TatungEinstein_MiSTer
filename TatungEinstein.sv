@@ -273,6 +273,7 @@ pll pll
 	.rst(0),
 	.outclk_0(clk_sys), // 32
 	.outclk_1(clk_vdp)  // 10
+	// TODO: fix timing
 );
 
 wire reset = RESET | status[0] | buttons[1];

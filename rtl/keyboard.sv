@@ -97,16 +97,16 @@ always @(posedge clk_sys) begin
 
 	if(input_strobe) begin
 		case(code)
-			8'h59: modif[0]<= ~press_btn; // right shift
-			8'h11: modif[1]<= ~press_btn; // alt
-			8'h14: modif[2]<= ~press_btn; // ctrl
+			8'h59: modif[0] <= ~press_btn; // right shift
+			8'h11: modif[1] <= ~press_btn; // alt
+			8'h14: modif[2] <= ~press_btn; // ctrl
 		endcase
 
 		case(code)
 
             8'h7E : keys[0][0] <= ~press_btn; // Scroll lock mapped to Break key
-            8'h05 : keys[0][2] <= ~press_btn; // F1 -> F0
-            8'h0a : keys[0][3] <= ~press_btn; // F8 -> F7
+            8'h01 : keys[0][2] <= ~press_btn; // F9 -> F0
+            8'h83 : keys[0][3] <= ~press_btn; // F7 -> F7
             8'h77 : keys[0][4] <= ~press_btn; // Num Lock -> Alpha Lock (Caps lock is 0x58)
             8'h5a : keys[0][5] <= ~press_btn; // Enter 0x5a 90
             8'h29 : keys[0][6] <= ~press_btn; // Space
@@ -119,7 +119,7 @@ always @(posedge clk_sys) begin
             8'h54 : keys[1][4] <= ~press_btn; // [ -> £
             8'h72 : keys[1][5] <= ~press_btn; // DN Arrow -> VT/LF
             8'h75 : keys[1][5] <= ~press_btn; // UP Arrow -> VT/LF
-            8'h01 : keys[1][6] <= ~press_btn; // F9 -> 1/2
+            8'h0a : keys[1][6] <= ~press_btn; // F8 -> 1/2
             8'h45 : keys[1][7] <= ~press_btn; // 0
 
             8'h42 : keys[2][0] <= ~press_btn; // K
@@ -130,7 +130,7 @@ always @(posedge clk_sys) begin
             8'h6B : keys[2][5] <= ~press_btn; // LF Arrow -> BS/HT
             8'h74 : keys[2][5] <= ~press_btn; // RT Arrow -> BS/HT
             8'h29 : keys[2][6] <= ~press_btn; // )
-            8'h0b : keys[2][7] <= ~press_btn; // F6 -> F5
+            8'h03 : keys[2][7] <= ~press_btn; // F6 -> F6
 
             8'h41 : keys[3][0] <= ~press_btn; // , -> <
             8'h49 : keys[3][1] <= ~press_btn; // . -> >
@@ -139,7 +139,7 @@ always @(posedge clk_sys) begin
             8'h66 : keys[3][4] <= ~press_btn; // Backspace -> INS/DEL
             8'h4e : keys[3][5] <= ~press_btn; // -=
             8'h79 : keys[3][6] <= ~press_btn; // + -> ÷
-            8'h03 : keys[3][7] <= ~press_btn; // F5 -> F4
+            8'h0c : keys[3][7] <= ~press_btn; // F5 -> F5
 
             8'h3d : keys[4][0] <= ~press_btn; // 7
             8'h36 : keys[4][1] <= ~press_btn; // 6
@@ -148,7 +148,7 @@ always @(posedge clk_sys) begin
             8'h26 : keys[4][4] <= ~press_btn; // 3
             8'h1e : keys[4][5] <= ~press_btn; // 2
             8'h16 : keys[4][6] <= ~press_btn; // ! 0x16 22
-            8'h0c : keys[4][7] <= ~press_btn; // F4 -> F~3
+            8'h04 : keys[4][7] <= ~press_btn; // F4 -> F4
 
             8'h3c : keys[5][0] <= ~press_btn; // U
             8'h35 : keys[5][1] <= ~press_btn; // Y
@@ -157,7 +157,7 @@ always @(posedge clk_sys) begin
             8'h24 : keys[5][4] <= ~press_btn; // E 0x24 36
             8'h1d : keys[5][5] <= ~press_btn; // W
             8'h15 : keys[5][6] <= ~press_btn; // Q
-            8'h04 : keys[5][7] <= ~press_btn; // F3 -> F2
+            8'h06 : keys[5][7] <= ~press_btn; // F3 -> F3
 
             8'h3b : keys[6][0] <= ~press_btn; // J
             8'h33 : keys[6][1] <= ~press_btn; // H
@@ -166,7 +166,7 @@ always @(posedge clk_sys) begin
             8'h23 : keys[6][4] <= ~press_btn; // D
             8'h1b : keys[6][5] <= ~press_btn; // S
             8'h1c : keys[6][6] <= ~press_btn; // A 0x1c 28
-            8'h06 : keys[6][7] <= ~press_btn; // F2 -> F1
+            8'h05 : keys[6][7] <= ~press_btn; // F2 -> F2
 
             8'h3a : keys[7][0] <= ~press_btn; // M
             8'h31 : keys[7][1] <= ~press_btn; // N
@@ -175,7 +175,7 @@ always @(posedge clk_sys) begin
             8'h21 : keys[7][4] <= ~press_btn; // C
             8'h22 : keys[7][5] <= ~press_btn; // X
             8'h1a : keys[7][6] <= ~press_btn; // Z
-            8'h83 : keys[7][7] <= ~press_btn; // F7 -> F6 0x83 131
+            8'h0b : keys[7][7] <= ~press_btn; // F7 -> F7 0x83 131
 
 			default: ;
 		endcase

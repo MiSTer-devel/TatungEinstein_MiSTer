@@ -223,7 +223,7 @@ reg   [7:0] wdreg_data;
 //	{~ready, s_readonly & s_wpe, s_wrfault,    s_seekerr | ~ready, s_crcerr, s_lostdata,  s_drq,   s_busy};
 
 // wd1770
-// s_index 0 : type I command
+// cmd_mode 0 : type I command
 wire  [7:0] wdreg_status = {
 	ready,
 	s_readonly & s_wpe,

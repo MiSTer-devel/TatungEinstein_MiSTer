@@ -83,6 +83,8 @@ always @*
   end*/
 
 // keyboard interrupt & mask
+// kb_en is i031a
+// kb_int_mask is i031b
 reg kb_int_n, kb_int_mask;
 reg old_kb_en;
 wire kb_en = ~&kb_col;
@@ -128,27 +130,6 @@ always @(posedge clk_sys) clk_cnt <= clk_cnt + 4'd1;
 //end
 
 // CPU
-
-// tv80s tv80s(
-//   .reset_n(~reset),
-//   .clk(clk_sys),
-//   .wait_n(1'b1),
-//   .int_n(1'b1),
-//   .nmi_n(1'b1),
-//   .busrq_n(1'b1),
-//   .m1_n(m1_n),
-//   .mreq_n(mreq_n),
-//   .iorq_n(iorq_n),
-//   .rd_n(rd_n),
-//   .wr_n(wr_n),
-//   .rfsh_n(),
-//   .halt_n(),
-//   .busak_n(),
-//   .A(cpu_addr),
-//   .di(cpu_din),
-//   .dout(cpu_dout)
-// );
-
 
 t80s t80s(
   .RESET_n(~reset),
@@ -358,9 +339,6 @@ z80ctc ctc(
 
 
 // FDC - disk controller
-// DSD, 40 tracks on each side.
-// 1 track = 10 sectors of 512 bytes.
-// 
 
 reg [3:0] I043_q; // drive-select
 reg floppy_side;
@@ -369,35 +347,10 @@ wire [7:0] fdc_dout;
 always @(posedge clk_sys)
   if (~DRSEL_n && ~wr_n) { floppy_side, I043_q } <= ~cpu_dout[4:0];
 
-// fdc1772 fdc(
-//   .clkcpu(clk_sys),
-//   .clk8m_en(clk_fdc),
-//   .floppy_drive(I043_q),
-//   .floppy_side(~floppy_side),
-//   .floppy_reset(soft_reset),
-//   .irq(),
-//   .drq(),
-//   .cpu_addr(cpu_addr[1:0]),
-//   .cpu_sel(~FDC_n),
-//   .cpu_rw(wr_n),
-//   .cpu_din(cpu_dout),
-//   .cpu_dout(fdc_dout),
-//   .img_mounted(img_mounted),
-//   .img_wp(img_readonly),
-//   .img_size(img_size),
-//   .sd_lba(sd_lba),
-//   .sd_rd(sd_rd),
-//   .sd_wr(sd_wr),
-//   .sd_ack(sd_ack),
-//   .sd_buff_addr(sd_buff_addr),
-//   .sd_dout(sd_dout),
-//   .sd_din(sd_din),
-//   .sd_dout_strobe(sd_dout_strobe)
-// );
-
 reg fdd_ready = 0;
 always @(posedge clk_sys)
-  if (img_mounted) fdd_ready <= |img_size;
+  if (img_mounted) fdd_ready <= 1'b1;
+  // if (img_mounted) fdd_ready <= |img_size;
 
 wd1793 #(.RWMODE(1), .EDSK(1)) fdc(
   .clk_sys(clk_sys),
@@ -416,7 +369,7 @@ wd1793 #(.RWMODE(1), .EDSK(1)) fdc(
   .size_code(3'b100),
   .layout(0),
   .side(~floppy_side),
-  .ready(fdd_ready),
+  .ready(fdd_ready | diagnostic),
   .img_mounted(img_mounted),
   .img_size(img_size),
   .prepare(),
