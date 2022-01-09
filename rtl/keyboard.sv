@@ -93,6 +93,10 @@ always @(posedge clk_sys) begin
 		keys[5] <= 8'b11111111;
 		keys[6] <= 8'b11111111;
 		keys[7] <= 8'b11111111;
+		
+		modif[0] <= 1'b1;
+		modif[1] <= 1'b1;
+		modif[2] <= 1'b1;
 	end
 
 	if(input_strobe) begin
@@ -105,6 +109,7 @@ always @(posedge clk_sys) begin
 		case(code)
 
             8'h7E : keys[0][0] <= ~press_btn; // Scroll lock mapped to Break key
+            8'h0D : keys[0][0] <= ~press_btn; // Tab also mapped to Break key
             8'h01 : keys[0][2] <= ~press_btn; // F9 -> F0
             8'h83 : keys[0][3] <= ~press_btn; // F7 -> F7
             8'h77 : keys[0][4] <= ~press_btn; // Num Lock -> Alpha Lock (Caps lock is 0x58)

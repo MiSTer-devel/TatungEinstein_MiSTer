@@ -58,7 +58,8 @@ wire [7:0] cpu_din =
   ~PSG_n & ~rd_n ? I030_dout :
   ~VDP_n & ~rd_n ? vdp_dout :
   ~m1_n & ~iorq_n ? nz80v :
-//  ~KB_MSK_n & ~rd_n ? { kb_shift, kb_ctrl, kb_graph, 1'd1, 4'd0 } : // todo: add I036 (printer/fire)
+  ~KB_MSK_n & ~rd_n ? { kb_shift, kb_ctrl, kb_graph, 1'd0, 4'd0 } : // todo: add I036 (printer/fire)\
+// 
   ~FDC_n & ~rd_n ? fdc_dout :
   ctc_doe ? ctc_dout :
   rom_a ? rom_a_dout :
