@@ -102,7 +102,7 @@ always @(posedge clk_sys) begin
 	if(input_strobe) begin
 		case(code)
 			8'h59: modif[0] <= ~press_btn; // right shift
-            8'h12: modif[0] <= ~press_btn; // left shift
+			8'h12: modif[0] <= ~press_btn; // left shift
 			8'h11: modif[1] <= ~press_btn; // alt
 			8'h14: modif[2] <= ~press_btn; // ctrl
 		endcase
@@ -124,7 +124,10 @@ always @(posedge clk_sys) begin
             8'h5b : keys[1][3] <= ~press_btn; // ] -> 1/4
             8'h54 : keys[1][4] <= ~press_btn; // [ -> £
             8'h72 : keys[1][5] <= ~press_btn; // DN Arrow -> VT/LF
-            8'h75 : keys[1][5] <= ~press_btn; // UP Arrow -> VT/LF
+            8'h75 : begin
+					keys[1][5] <= ~press_btn; // UP Arrow -> VT/LF
+					modif[0] <= ~press_btn;
+				end
             8'h0a : keys[1][6] <= ~press_btn; // F8 -> 1/2
             8'h45 : keys[1][7] <= ~press_btn; // 0
 
@@ -133,7 +136,10 @@ always @(posedge clk_sys) begin
             8'h4c : keys[2][2] <= ~press_btn; // ; -> +
             8'h52 : keys[2][3] <= ~press_btn; // ' -> *
             8'h5d : keys[2][4] <= ~press_btn; // \ -> 3/4
-            8'h6B : keys[2][5] <= ~press_btn; // LF Arrow -> BS/HT
+            8'h6B : begin
+					keys[2][5] <= ~press_btn; // LF Arrow -> BS/HT
+					modif[0] <= ~press_btn;
+				end
             8'h74 : keys[2][5] <= ~press_btn; // RT Arrow -> BS/HT
             8'h29 : keys[2][6] <= ~press_btn; // )
             8'h03 : keys[2][7] <= ~press_btn; // F6 -> F6
