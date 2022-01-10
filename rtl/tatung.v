@@ -110,8 +110,9 @@ always @(posedge clk_sys) begin
 end
 
 reg [1:0] fire_old;
-wire fire_new = { joystick_1[0], joystick_0[0] };
-reg fire_int_n, fire_int_mask;
+wire [1:0] fire_new = { joystick_1[0], joystick_0[0] };
+reg fire_int_n = 1'b1;
+reg fire_int_mask = 1'b1;
 always @(posedge clk_sys) begin
 	fire_old <= { joystick_1[0], joystick_0[0] };
 	if (reset) begin
@@ -121,7 +122,7 @@ always @(posedge clk_sys) begin
 	else if (~wr_n & ~FIREINT_MSK_n) begin
 		fire_int_mask <= cpu_dout[0];
 	end
-	if (fire_old ^ fire_new) begin
+	if (fire_old ^ fire_new & |fire_new & ~fire_int_mask) begin
 		fire_int_n <= 1'b0;
 	end
 end
