@@ -205,7 +205,7 @@ assign VIDEO_ARY = (!ar) ? 12'd3 : 12'd0;
 localparam CONF_STR = {
 	"TatungEinstein;;",
 	"S0,DSK,Mount Disk 0:;",
- 	"S1,DSK,Mount Disk 1:;",
+ 	//"S1,DSK,Mount Disk 1:;",
 	"-;",
 	"H0O89,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"-;",
@@ -230,8 +230,11 @@ wire  [7:0] sd_buff_dout;
 wire  [7:0] sd_buff_din;
 wire        sd_buff_wr;
 wire  [1:0] img_mounted;
-wire        img_readonly;
+wire  [1:0] img_readonly;
 wire [63:0] img_size;
+
+wire [15:0] joystick_0;
+wire [15:0] joystick_1;
 
 hps_io #(.CONF_STR(CONF_STR)) hps_io
 (
@@ -260,7 +263,10 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 
 	.img_mounted(img_mounted),
 	.img_readonly(img_readonly),
-	.img_size(img_size)
+	.img_size(img_size),
+
+	.joystick_0(joystick_0),
+	.joystick_1(joystick_1)
 );
 
 ///////////////////////   CLOCKS   ///////////////////////////////
@@ -339,6 +345,9 @@ tatung tatung
 	.sd_dout(sd_buff_dout),
 	.sd_din(sd_buff_din),
 	.sd_dout_strobe(sd_buff_wr),
+
+	.joystick_0(joystick_0),
+	.joystick_1(joystick_1),
 
 	.diagnostic(status[6]),
 	.border(status[7])

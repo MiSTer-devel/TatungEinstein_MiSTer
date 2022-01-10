@@ -35,6 +35,9 @@ module tatung(
   output [7:0] sd_din,
   input sd_dout_strobe,
 
+  input [15:0] joystick_0,
+  input [15:0] joystick_1,
+
   input diagnostic,
   input border
 
@@ -58,8 +61,7 @@ wire [7:0] cpu_din =
   ~PSG_n & ~rd_n ? I030_dout :
   ~VDP_n & ~rd_n ? vdp_dout :
   ~m1_n & ~iorq_n ? nz80v :
-  ~KB_MSK_n & ~rd_n ? { kb_shift, kb_ctrl, kb_graph, 1'd0, 4'd0 } : // todo: add I036 (printer/fire)\
-// 
+  ~KB_MSK_n & ~rd_n ? { kb_shift, kb_ctrl, kb_graph, 3'd0, joystick_1[0], joystick_0[0] } : // todo: add I036 (printer/fire)\
   ~FDC_n & ~rd_n ? fdc_dout :
   ctc_doe ? ctc_dout :
   rom_a ? rom_a_dout :
@@ -78,10 +80,10 @@ always @*
   end
   /*else if (~adc_int_n) begin
     nz80v = 8'h0a;
-  end
+  end*/
   else if (~fire_int_n) begin
     nz80v = 8'h0c;
-  end*/
+  end
 
 // keyboard interrupt & mask
 // kb_en is i031a
@@ -107,7 +109,24 @@ always @(posedge clk_sys) begin
   end
 end
 
-wire int_n = ctc_int_n & kb_int_n;// 1'b1;//kb_int_n & ctc_int_n;
+reg [1:0] fire_old;
+wire fire_new = { joystick_1[0], joystick_0[0] };
+reg fire_int_n, fire_int_mask;
+always @(posedge clk_sys) begin
+	fire_old <= { joystick_1[0], joystick_0[0] };
+	if (reset) begin
+		fire_int_mask <= 1'b1;
+		fire_int_n <= 1'b1;
+	end
+	else if (~wr_n & ~FIREINT_MSK_n) begin
+		fire_int_mask <= cpu_dout[0];
+	end
+	if (fire_old ^ fire_new) begin
+		fire_int_n <= 1'b0;
+	end
+end
+
+wire int_n = ctc_int_n & kb_int_n & fire_int_n;
 
 
 // 2M clock & enable
@@ -156,15 +175,15 @@ t80s t80s(
 
 // I/O enables
 
-wire ADC, PIO, CTC_n, I026_Y4, FDC_n, PCI, VDP_n, PSG_n;
-wire JR, MB, FIREINT_MSK, ROM_n, DRSEL_n, APH, ADC_MSK, KB_MSK_n;
+wire ADC_n, PIO, CTC_n, I026_Y4, FDC_n, PCI, VDP_n, PSG_n;
+wire JR, MB, FIREINT_MSK_n, ROM_n, DRSEL_n, APH, ADC_MSK, KB_MSK_n;
 
 x74138 I026(
   .G1(~(iorq_n|~m1_n)),
   .G2A(cpu_addr[6]),
   .G2B(cpu_addr[7]),
   .A(cpu_addr[5:3]),
-  .Y({ ADC, PIO, CTC_n, I026_Y4, FDC_n, PCI, VDP_n, PSG_n })
+  .Y({ ADC_n, PIO, CTC_n, I026_Y4, FDC_n, PCI, VDP_n, PSG_n })
 );
 
 x74138 I027(
@@ -172,7 +191,7 @@ x74138 I027(
   .G2A(I026_Y4),
   .G2B(1'b0),
   .A(cpu_addr[2:0]),
-  .Y({ JR, MB, FIREINT_MSK, ROM_n, DRSEL_n, APH, ADC_MSK, KB_MSK_n })
+  .Y({ JR, MB, FIREINT_MSK_n, ROM_n, DRSEL_n, APH, ADC_MSK, KB_MSK_n })
 );
 
 // ROM status toggler
@@ -351,7 +370,6 @@ always @(posedge clk_sys)
 reg fdd_ready = 0;
 always @(posedge clk_sys)
   if (img_mounted) fdd_ready <= 1'b1;
-  // if (img_mounted) fdd_ready <= |img_size;
 
 wd1793 #(.RWMODE(1), .EDSK(1)) fdc(
   .clk_sys(clk_sys),
@@ -383,5 +401,6 @@ wd1793 #(.RWMODE(1), .EDSK(1)) fdc(
   .sd_buff_din(sd_din),
   .sd_buff_wr(sd_dout_strobe)
 );
+
 
 endmodule
