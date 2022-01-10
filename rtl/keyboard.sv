@@ -102,6 +102,7 @@ always @(posedge clk_sys) begin
 	if(input_strobe) begin
 		case(code)
 			8'h59: modif[0] <= ~press_btn; // right shift
+            8'h12: modif[0] <= ~press_btn; // left shift
 			8'h11: modif[1] <= ~press_btn; // alt
 			8'h14: modif[2] <= ~press_btn; // ctrl
 		endcase
