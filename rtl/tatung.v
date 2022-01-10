@@ -61,7 +61,7 @@ wire [7:0] cpu_din =
   ~PSG_n & ~rd_n ? I030_dout :
   ~VDP_n & ~rd_n ? vdp_dout :
   ~m1_n & ~iorq_n ? nz80v :
-  ~KB_MSK_n & ~rd_n ? { kb_shift, kb_ctrl, kb_graph, 3'd0, joystick_1[4], joystick_0[4] } : // todo: add I036 (printer/fire)\
+  ~KB_MSK_n & ~rd_n ? { kb_shift, kb_ctrl, kb_graph, 3'd0, ~joystick_1[4], ~joystick_0[4] } : // todo: add I036 (printer/fire)\
   ~FDC_n & ~rd_n ? fdc_dout :
   ctc_doe ? ctc_dout :
   rom_a ? rom_a_dout :
@@ -109,12 +109,9 @@ always @(posedge clk_sys) begin
   end
 end
 
-reg [1:0] fire_old;
-wire [1:0] fire_new = { joystick_1[4], joystick_0[4] };
 reg fire_int_n = 1;
 reg fire_int_mask = 1;
 always @(posedge clk_sys) begin
-	fire_old <= { joystick_1[4], joystick_0[4] };
 	if (reset) begin
 		fire_int_mask <= 1'b1;
     fire_int_n <= 1'b1;
@@ -122,9 +119,7 @@ always @(posedge clk_sys) begin
 	else if (~wr_n & ~FIREINT_MSK_n) begin
 		fire_int_mask <= cpu_dout[0];
 	end
-	if (fire_old^fire_new & ~fire_int_mask) begin
-		fire_int_n <= ~|fire_new;
-	end
+	fire_int_n <= ~(joystick_0[4]|joystick_1[4]) | fire_int_mask;
 end
 
 wire int_n = ctc_int_n & kb_int_n & fire_int_n;
