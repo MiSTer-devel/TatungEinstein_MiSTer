@@ -37,9 +37,12 @@ module tatung(
 
   input [15:0] joystick_0,
   input [15:0] joystick_1,
+  input [15:0] joystick_analog_0,
+  input [15:0] joystick_analog_1,
 
   input diagnostic,
-  input border
+  input border,
+  input analog
 
 );
 
@@ -405,6 +408,9 @@ wd1793 #(.RWMODE(1), .EDSK(1)) fdc(
 wire [7:0] adc_dout;
 wire adc_intr_n;
 
+wire [3:0] dj1 = { joystick_0[2], joystick_0[3], joystick_0[1], joystick_0[0] };
+wire [3:0] dj2 = { joystick_1[2], joystick_1[3], joystick_1[1], joystick_1[0] };
+
 ADC0844 adc(
   .clk(clk_sys),
   .ma(cpu_dout[3:0]),
@@ -413,13 +419,13 @@ ADC0844 adc(
   .wr_n(wr_n),
   .cs_n(ADC_n),
   .intr_n(adc_intr_n),
-  .ch1(),
-  .ch2(),
-  .ch3(),
-  .ch4(),
-  .analog(0),
-  .dj1(joystick_0[3:0]),
-  .dj2(joystick_1[3:0])
+  .ch1(joystick_analog_0[7:0]+127),
+  .ch2(255-(joystick_analog_0[15:8]+127)),
+  .ch3(joystick_analog_1[7:0]+127),
+  .ch4(255-(joystick_analog_1[15:8]+127)),
+  .analog(analog),
+  .dj1(dj1),
+  .dj2(dj2)
 );
 
 endmodule

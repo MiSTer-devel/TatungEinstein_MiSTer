@@ -5,17 +5,17 @@ module ADC0844(
 
   input [3:0] ma,
   output reg [7:0] db,
-  
+
   input rd_n,
   input wr_n,
   input cs_n,
   output reg intr_n = 1,
-  
+
   input [7:0] ch1,
   input [7:0] ch2,
   input [7:0] ch3,
   input [7:0] ch4,
-  
+
   input analog,
   input [3:0] dj1,
   input [3:0] dj2
@@ -27,12 +27,32 @@ reg old_rd;
 reg [3:0] conf;
 reg convert = 1'b0;
 reg [7:0] dout;
+reg adc_wr;
 
 always @(posedge clk) begin
-  
+
   old_wr <= wr_n;
   old_rd <= rd_n;
-  
+
+  // reset int on the falling edge of wr_n
+  if (old_wr & ~wr_n & ~cs_n) begin
+    adc_wr <= 1'b1; // mark as a valid write
+    intr_n <= 1'b1;
+  end
+
+  // valid write rising edge
+  if (~old_wr & wr_n & adc_wr) begin
+
+    adc_wr <= 1'b0;
+
+    // latch config if not reading
+    if (rd_n) begin
+      conf <= ma;
+      convert <= 1'b1;
+    end
+
+  end
+
   if (convert) begin
 
     // prepare output
@@ -53,46 +73,25 @@ always @(posedge clk) begin
     end
     else begin
       case (conf[1:0])
-        2'b00: dout <= dj1[0] ? 8'd240 : dj1[1] ? 8'd16 : 8'd0;
-        2'b01: dout <= dj1[2] ? 8'd240 : dj1[3] ? 8'd16 : 8'd0;
-        2'b10: dout <= dj2[0] ? 8'd240 : dj2[1] ? 8'd16 : 8'd0;
-        2'b11: dout <= dj2[2] ? 8'd240 : dj2[3] ? 8'd16 : 8'd0;
+        2'b00: dout <= dj1[0] ? 8'd255 : dj1[1] ? 8'd0 : 8'd128;
+        2'b01: dout <= dj1[2] ? 8'd255 : dj1[3] ? 8'd0 : 8'd128;
+        2'b10: dout <= dj2[0] ? 8'd255 : dj2[1] ? 8'd0 : 8'd128;
+        2'b11: dout <= dj2[2] ? 8'd255 : dj2[3] ? 8'd0 : 8'd128;
       endcase
     end
-    
+
     // inform we are ready
     intr_n <= 1'b0;
-    
-    // falling edge of rd
+
+    // output data on the falling edge of rd_n and reset int
     if (old_rd & ~rd_n & ~cs_n) begin
       convert <= 1'b0;
       intr_n <= 1'b1;
       db <= dout;
     end
-  
+
   end
-  
-  else begin
-  
-    // wr rising edge
-    if (~old_wr & wr_n) begin
-    
-      // latch config if not reading
-      if (rd_n) begin
-        conf <= ma;
-        convert <= 1'b1;
-      end
-      
-    end
-    
-    // reset int on falling edge of wr
-    if (old_wr & ~wr_n & ~cs_n) begin
-      intr_n <= 1'b1;
-    end
-  
-  end
-    
-  
+
 end
 
 endmodule

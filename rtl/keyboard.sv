@@ -113,7 +113,7 @@ always @(posedge clk_sys) begin
             8'h0D : keys[0][0] <= ~press_btn; // Tab also mapped to Break key
             8'h01 : keys[0][2] <= ~press_btn; // F9 -> F0
             8'h83 : keys[0][3] <= ~press_btn; // F7 -> F7
-            8'h77 : keys[0][4] <= ~press_btn; // Num Lock -> Alpha Lock (Caps lock is 0x58)
+            8'h58 : keys[0][4] <= ~press_btn; // Num Lock -> Alpha Lock
             8'h5a : keys[0][5] <= ~press_btn; // Enter 0x5a 90
             8'h29 : keys[0][6] <= ~press_btn; // Space
             8'h76 : keys[0][6] <= ~press_btn; // Escape
@@ -133,7 +133,8 @@ always @(posedge clk_sys) begin
 
             8'h42 : keys[2][0] <= ~press_btn; // K
             8'h4b : keys[2][1] <= ~press_btn; // L 0x4b 75
-            8'h4c : keys[2][2] <= ~press_btn; // ; -> +
+            8'h4c : keys[2][2] <= ~press_btn; // ; +
+				
             8'h52 : keys[2][3] <= ~press_btn; // ' -> *
             8'h5d : keys[2][4] <= ~press_btn; // \ -> 3/4
             8'h6B : begin
@@ -141,7 +142,7 @@ always @(posedge clk_sys) begin
 					modif[0] <= ~press_btn;
 				end
             8'h74 : keys[2][5] <= ~press_btn; // RT Arrow -> BS/HT
-            8'h29 : keys[2][6] <= ~press_btn; // )
+            8'h46 : keys[2][6] <= ~press_btn; // 9 )
             8'h03 : keys[2][7] <= ~press_btn; // F6 -> F6
 
             8'h41 : keys[3][0] <= ~press_btn; // , -> <

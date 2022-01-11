@@ -209,6 +209,7 @@ localparam CONF_STR = {
 	"-;",
 	"H0O89,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"-;",
+	"O5,Joystick,Digital,Analog;",
 	"O6,Diagnostic ROM mounted,Off,On;",
 	"O7,Border,Off,On;",
 	"-;",
@@ -235,6 +236,8 @@ wire [63:0] img_size;
 
 wire [15:0] joystick_0;
 wire [15:0] joystick_1;
+wire [15:0] joystick_analog_0;
+wire [15:0] joystick_analog_1;
 
 hps_io #(.CONF_STR(CONF_STR)) hps_io
 (
@@ -266,7 +269,9 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 	.img_size(img_size),
 
 	.joystick_0(joystick_0),
-	.joystick_1(joystick_1)
+	.joystick_1(joystick_1),
+	.joystick_l_analog_0(joystick_analog_0),
+	.joystick_l_analog_1(joystick_analog_1)
 );
 
 ///////////////////////   CLOCKS   ///////////////////////////////
@@ -279,7 +284,6 @@ pll pll
 	.rst(0),
 	.outclk_0(clk_sys), // 32
 	.outclk_1(clk_vdp)  // 10
-	// TODO: fix timing
 );
 
 wire reset = RESET | status[0] | buttons[1];
@@ -348,9 +352,12 @@ tatung tatung
 
 	.joystick_0(joystick_0),
 	.joystick_1(joystick_1),
+	.joystick_analog_0(joystick_analog_0),
+   	.joystick_analog_1(joystick_analog_1),
 
 	.diagnostic(status[6]),
-	.border(status[7])
+	.border(status[7]),
+	.analog(status[5])
 );
 
 wire HBlank;
