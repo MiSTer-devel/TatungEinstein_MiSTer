@@ -27,3 +27,5 @@ set_global_assignment -name VHDL_FILE rtl/vdp18/vdp18_addr_mux.vhd
 set_global_assignment -name VHDL_FILE rtl/vdp18/vdp18_core.vhd
 
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/fdc/wd1793.sv
+
+set_global_assignment -name VERILOG_FILE rtl/ADC0844.v

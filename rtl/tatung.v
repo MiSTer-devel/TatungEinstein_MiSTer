@@ -61,8 +61,9 @@ wire [7:0] cpu_din =
   ~PSG_n & ~rd_n ? I030_dout :
   ~VDP_n & ~rd_n ? vdp_dout :
   ~m1_n & ~iorq_n ? nz80v :
-  ~KB_MSK_n & ~rd_n ? { kb_shift, kb_ctrl, kb_graph, 3'd0, ~joystick_1[4], ~joystick_0[4] } : // todo: add I036 (printer/fire)\
+  ~KB_MSK_n & ~rd_n ? { kb_shift, kb_ctrl, kb_graph, 3'b100, ~joystick_1[4], ~joystick_0[4] } : // todo: add I036 (printer/fire)
   ~FDC_n & ~rd_n ? fdc_dout :
+  ~ADC_n & ~rd_n ? adc_dout :
   ctc_doe ? ctc_dout :
   rom_a ? rom_a_dout :
   rom_b ? rom_b_dout :
@@ -78,9 +79,9 @@ always @*
   else if (~ctc_int_n) begin
     nz80v = ctc_dout;
   end
-  /*else if (~adc_int_n) begin
+  else if (~adc_int_n) begin
     nz80v = 8'h0a;
-  end*/
+  end
   else if (~fire_int_n) begin
     nz80v = 8'h0c;
   end
@@ -112,6 +113,7 @@ end
 reg fire_int_n = 1;
 reg fire_int_mask = 1;
 always @(posedge clk_sys) begin
+  fire_int_n <= ~(joystick_0[4]|joystick_1[4]) | fire_int_mask;
 	if (reset) begin
 		fire_int_mask <= 1'b1;
     fire_int_n <= 1'b1;
@@ -119,10 +121,22 @@ always @(posedge clk_sys) begin
 	else if (~wr_n & ~FIREINT_MSK_n) begin
 		fire_int_mask <= cpu_dout[0];
 	end
-	fire_int_n <= ~(joystick_0[4]|joystick_1[4]) | fire_int_mask;
 end
 
-wire int_n = ctc_int_n & kb_int_n & fire_int_n;
+reg adc_int_n = 1;
+reg adc_int_mask = 1;
+always @(posedge clk_sys) begin
+  adc_int_n <= adc_intr_n | adc_int_mask;
+	if (reset) begin
+		adc_int_mask <= 1'b1;
+    adc_int_n <= 1'b1;
+	end
+	else if (~wr_n & ~ADC_MSK_n) begin
+		adc_int_mask <= cpu_dout[0];
+	end
+end
+
+wire int_n = ctc_int_n & kb_int_n & fire_int_n & adc_int_n;
 
 
 // 2M clock & enable
@@ -131,19 +145,6 @@ reg [3:0] clk_cnt;
 wire clk_2 = clk_cnt[3];
 wire cen_2 = clk_cnt == 4'b1111;
 always @(posedge clk_sys) clk_cnt <= clk_cnt + 4'd1;
-
-//always @(posedge clk_sys) begin
-//  cen_2 <= 1'b0;
-//  clk_cnt <= clk_cnt + 4'd1;
-//  if (clk_cnt == 5'd19) begin
-//    cen_2 <= 1'b1;
-//	 clk_2 <= 1'b1;
-//    clk_cnt <= 5'd0;
-//  end
-//  else if (clk_cnt == 5'd9) begin
-//    clk_2 <= 1'b0;
-//  end
-//end
 
 // CPU
 
@@ -172,7 +173,7 @@ t80s t80s(
 // I/O enables
 
 wire ADC_n, PIO, CTC_n, I026_Y4, FDC_n, PCI, VDP_n, PSG_n;
-wire JR, MB, FIREINT_MSK_n, ROM_n, DRSEL_n, APH, ADC_MSK, KB_MSK_n;
+wire JR, MB, FIREINT_MSK_n, ROM_n, DRSEL_n, APH, ADC_MSK_n, KB_MSK_n;
 
 x74138 I026(
   .G1(~(iorq_n|~m1_n)),
@@ -187,7 +188,7 @@ x74138 I027(
   .G2A(I026_Y4),
   .G2B(1'b0),
   .A(cpu_addr[2:0]),
-  .Y({ JR, MB, FIREINT_MSK_n, ROM_n, DRSEL_n, APH, ADC_MSK, KB_MSK_n })
+  .Y({ JR, MB, FIREINT_MSK_n, ROM_n, DRSEL_n, APH, ADC_MSK_n, KB_MSK_n })
 );
 
 // ROM status toggler
@@ -398,5 +399,27 @@ wd1793 #(.RWMODE(1), .EDSK(1)) fdc(
   .sd_buff_wr(sd_dout_strobe)
 );
 
+
+// ADC
+
+wire [7:0] adc_dout;
+wire adc_intr_n;
+
+ADC0844 adc(
+  .clk(clk_sys),
+  .ma(cpu_dout[3:0]),
+  .db(adc_dout),
+  .rd_n(rd_n),
+  .wr_n(wr_n),
+  .cs_n(ADC_n),
+  .intr_n(adc_intr_n),
+  .ch1(),
+  .ch2(),
+  .ch3(),
+  .ch4(),
+  .analog(0),
+  .dj1(joystick_0[3:0]),
+  .dj2(joystick_1[3:0])
+);
 
 endmodule
