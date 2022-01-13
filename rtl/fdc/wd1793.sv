@@ -22,7 +22,7 @@
 //
 //============================================================================
 
-module wd1793 #(parameter RWMODE=0, EDSK=1)
+module wd1793 #(parameter RWMODE=0, EDSK=1, DS=0)
 (
 	input        clk_sys,     // sys clock
 	input        ce,          // ce at CPU clock rate
@@ -227,7 +227,7 @@ reg   [7:0] wdreg_data;
 wire  [7:0] wdreg_status = {
 	ready,
 	s_readonly & s_wpe,
-	cmd_mode == 0 ? spin_cnt >= 6 : 1'b0,
+	cmd_mode == 0 ? motor_spin_up_done : 1'b0,
 	s_seekerr,
 	s_crcerr,
 	cmd_mode == 0 ? (EDSK ? edsk_track == 0 : disk_track == 0) : s_lostdata,
@@ -271,9 +271,14 @@ end
 
 reg reset_spin;
 reg [23:0] spin_cnt = 0;
+reg motor_spin_up_done;
 always @(posedge s_index) begin
-  if (reset_spin) spin_cnt <= 24'd0;
+  if (reset_spin) begin
+    spin_cnt <= 24'd0;
+    motor_spin_up_done <= 1'b0;
+  end
   spin_cnt <= spin_cnt + 24'd1;
+  if (spin_cnt > 6) motor_spin_up_done <= 1'b1;
 end
   
   
@@ -440,7 +445,7 @@ always @(posedge clk_sys) begin
 			STATE_SEARCH_1:
 				begin
 					if(rw_type & (edsk_track == disk_track) &
-									 (edsk_side == side) &
+									 (!DS | (edsk_side == side)) &
 									 (format | (edsk_sector == wdreg_sector))) begin
 						state <= STATE_WAIT_READ;
 					end
