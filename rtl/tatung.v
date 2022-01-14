@@ -139,13 +139,13 @@ reg fire_int_n = 1;
 reg fire_int_mask = 1;
 always @(posedge clk_sys) begin
   fire_int_n <= ~(joystick_0[4]|joystick_1[4]) | fire_int_mask | ~ctc_ieo;
-	if (reset) begin
-		fire_int_mask <= 1'b1;
+  if (reset) begin
+    fire_int_mask <= 1'b1;
     fire_int_n <= 1'b1;
-	end
-	else if (~wr_n & ~FIREINT_MSK_n) begin
-		fire_int_mask <= cpu_dout[0];
-	end
+  end
+  else if (~wr_n & ~FIREINT_MSK_n) begin
+    fire_int_mask <= cpu_dout[0];
+  end
 end
 
 // adc interrupt & mask
@@ -154,13 +154,13 @@ reg adc_int_n = 1;
 reg adc_int_mask = 1;
 always @(posedge clk_sys) begin
   adc_int_n <= (adc_intr_n | adc_int_mask) | ~ctc_ieo;
-	if (reset) begin
-		adc_int_mask <= 1'b1;
+  if (reset) begin
+    adc_int_mask <= 1'b1;
     adc_int_n <= 1'b1;
-	end
-	else if (~wr_n & ~ADC_MSK_n) begin
-		adc_int_mask <= cpu_dout[0];
-	end
+  end
+  else if (~wr_n & ~ADC_MSK_n) begin
+    adc_int_mask <= cpu_dout[0];
+  end
 end
 
 
@@ -228,7 +228,7 @@ always @(posedge ROM_n, posedge reset)
 
 // Memories
 
-	 
+   
 wire [7:0] rom_a_dout, rom_b_dout;
 
 wire rom_a = rom_en && ~I025a && ~cpu_addr[14];
