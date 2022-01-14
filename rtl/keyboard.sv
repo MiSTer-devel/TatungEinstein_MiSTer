@@ -59,11 +59,11 @@ module keyboard
 	input					kblayout,	// 0 = TRS-80 keyboard arrangement; 1 = PS/2 key assignment
 
 	output reg [11:1] Fn = 0,
-	output reg  [2:0] modif
+	output reg  [2:0] modif,
+   output reg press_btn = 0
 );
 
 reg  [7:0] keys[7:0];
-reg        press_btn = 0;
 reg  [7:0] code;
 reg		  shiftstate = 0;
 

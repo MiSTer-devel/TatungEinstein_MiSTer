@@ -21,6 +21,7 @@ module tatung(
   input kb_shift,
   input kb_ctrl,
   input kb_graph,
+  input kb_down,
 
   input [1:0] img_mounted,
   input [1:0] img_readonly,
@@ -63,7 +64,7 @@ wire ram_en = ~io_en;
 wire [7:0] cpu_din =
   ~PSG_n & ~rd_n ? I030_dout :
   ~VDP_n & ~rd_n ? vdp_dout :
-  ~m1_n & ~iorq_n ? nz80v :
+  ~I054c ? int_vect :
   ~KB_MSK_n & ~rd_n ? { kb_shift, kb_ctrl, kb_graph, 3'b100, ~joystick_1[4], ~joystick_0[4] } : // todo: add I036 (printer/fire)
   ~FDC_n & ~rd_n ? fdc_dout :
   ~ADC_n & ~rd_n ? adc_dout :
@@ -72,51 +73,72 @@ wire [7:0] cpu_din =
   rom_b ? rom_b_dout :
   ram_en ? ram_dout : 8'hff;
 
-  
-// interrupt vectors
-reg [7:0] nz80v;
-always @*
-  if (~kb_int_n) begin
-    nz80v = 8'h0e;
-  end
-  else if (~ctc_int_n) begin
-    nz80v = ctc_dout;
-  end
-  else if (~adc_int_n) begin
-    nz80v = 8'h0a;
-  end
-  else if (~fire_int_n) begin
-    nz80v = 8'h0c;
-  end
+// interrupts
+// see bottom left section of schematic: I055, I056 & I057
+
+reg int_n;
+reg I054c;
+wire T148gs;
+wire INA_n = m1_n | iorq_n;
+wire [3:0] T75q;
+wire [2:0] T148q;
+wire [7:0] int_vect;
+
+always @(posedge clk_sys) begin
+  I054c <= INA_n | T148gs;
+  if (reset)
+    int_n <= 1'b1;
+  else
+    int_n <= T148gs & ctc_int_n;
+end
+
+T7475 T7475(
+  .d({ 1'b1, adc_int_n, fire_int_n, kb_int_n }),
+  .en(I054c),
+  .q(T75q)
+);
+
+// priority encoder
+T74148 T74148(
+  .I({ 4'b1111, T75q[0], T75q[1], T75q[2], T75q[3] }),
+  .EN(1'b0),
+  .GS(T148gs),
+  .Q(T148q)
+);
+
+T74244 T74244(
+  .A({ 1'b0, T148q[0], T148q[1], T148q[2], 4'b0 }),
+  .OE({ I054c, I054c }),
+  .Y({
+    int_vect[0], int_vect[1], int_vect[2], int_vect[3],
+    int_vect[4], int_vect[5], int_vect[6], int_vect[7]
+  })
+);
 
 // keyboard interrupt & mask
-// kb_en is i031a
-// kb_int_mask is i031b
-reg kb_int_n, kb_int_mask;
-reg old_kb_en;
-wire kb_en = ~&kb_col;
+
+wire kb_int_n = I031a | I031b;
+
+reg I031a, oldkb;
 always @(posedge clk_sys) begin
-  old_kb_en <= kb_en;
-  if (reset) begin
-    kb_int_mask <= 1'b1;
-  end
-  else if (~wr_n & ~KB_MSK_n) begin
-    kb_int_mask <= cpu_dout[0];
-  end
-  // keyboard interrupt
-  if (reset || (~KB_MSK_n & ~rd_n)) begin
-    kb_int_n <= 1'b1;
-  end
-  else if (~kb_int_mask && ~old_kb_en && kb_en) begin
-    //if (kb_col) kb_int_n <= 1'b0;
-    kb_int_n <= 1'b0;
-  end
+  oldkb <= kb_down;
+  if (reset | (~KB_MSK_n & ~rd_n)) I031a <= 1'b1;
+  else if (!oldkb & kb_down) I031a <= 1'b0;
+  else I031a <= 1'b1;
 end
+
+reg I031b; // kb int mask
+always @(posedge clk_sys) begin
+  if (reset) I031b <= 1'b1;
+  else if (~wr_n & ~KB_MSK_n) I031b <= cpu_dout[0];
+end
+
+// fire interrupt & mask
 
 reg fire_int_n = 1;
 reg fire_int_mask = 1;
 always @(posedge clk_sys) begin
-  fire_int_n <= ~(joystick_0[4]|joystick_1[4]) | fire_int_mask;
+  fire_int_n <= ~(joystick_0[4]|joystick_1[4]) | fire_int_mask | ~ctc_ieo;
 	if (reset) begin
 		fire_int_mask <= 1'b1;
     fire_int_n <= 1'b1;
@@ -126,10 +148,12 @@ always @(posedge clk_sys) begin
 	end
 end
 
+// adc interrupt & mask
+
 reg adc_int_n = 1;
 reg adc_int_mask = 1;
 always @(posedge clk_sys) begin
-  adc_int_n <= adc_intr_n | adc_int_mask;
+  adc_int_n <= (adc_intr_n | adc_int_mask) | ~ctc_ieo;
 	if (reset) begin
 		adc_int_mask <= 1'b1;
     adc_int_n <= 1'b1;
@@ -138,8 +162,6 @@ always @(posedge clk_sys) begin
 		adc_int_mask <= cpu_dout[0];
 	end
 end
-
-wire int_n = ctc_int_n & kb_int_n & fire_int_n & adc_int_n;
 
 
 // 2M clock & enable

@@ -299,6 +299,7 @@ always @(posedge clk_sys) clk_div <= clk_div + 3'd1;
 wire [7:0] kb_row;
 wire [7:0] kb_col;
 wire shift, ctrl, graph;
+wire press_btn;
 
 keyboard keyboard(
   .clk_sys(clk_sys),
@@ -306,7 +307,8 @@ keyboard keyboard(
   .ps2_key(ps2_key),
   .addr(kb_row),
   .kb_cols(kb_col),
-  .modif({ ctrl, graph, shift })
+  .modif({ ctrl, graph, shift }),
+  .press_btn(press_btn)
 );
 
 wire [9:0] sound;
@@ -336,6 +338,7 @@ tatung tatung
 	.kb_shift(shift),
 	.kb_ctrl(ctrl),
 	.kb_graph(graph),
+	.kb_down(press_btn),
 
 	.img_mounted(img_mounted),
 	.img_readonly(img_readonly),

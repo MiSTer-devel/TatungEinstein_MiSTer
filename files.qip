@@ -8,6 +8,9 @@ set_global_assignment -name VERILOG_FILE rtl/dpram.v
 set_global_assignment -name VERILOG_FILE rtl/tatung.v
 set_global_assignment -name VERILOG_FILE rtl/x74138.v
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/keyboard.sv
+set_global_assignment -name VERILOG_FILE rtl/T7475.v
+set_global_assignment -name VERILOG_FILE rtl/T74148.v
+set_global_assignment -name VERILOG_FILE rtl/T74244.v
 
 #set_global_assignment -name VHDL_FILE rtl/ctc/ctc.vhd
 #set_global_assignment -name VHDL_FILE rtl/ctc/ctc_channel.vhd
