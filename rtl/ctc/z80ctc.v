@@ -328,7 +328,7 @@ begin
 		if(trg & trg_r1 & ~trg_r2)
 		begin
 			trg <= 1'b0;
-			reset_cnt <= 1'b1;
+			// reset_cnt <= 1'b1;
 		end
 
 		// countup / preload

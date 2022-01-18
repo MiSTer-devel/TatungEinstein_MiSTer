@@ -83,13 +83,16 @@ wire INA_n = m1_n | iorq_n;
 wire [3:0] T75q;
 wire [2:0] T148q;
 wire [7:0] int_vect;
+reg old_T148gs, old_ctc_int_n;
 
 always @(posedge clk_sys) begin
+  old_T148gs <= T148gs;
+  old_ctc_int_n <= ctc_int_n;
   I054c <= INA_n | T148gs;
-  if (reset)
+  if (reset | ~INA_n)
     int_n <= 1'b1;
-  else
-    int_n <= T148gs & ctc_int_n;
+  else if ((~T148gs & old_T148gs)|(old_ctc_int_n & ~ctc_int_n))
+    int_n <= 1'b0;
 end
 
 T7475 T7475(
@@ -123,13 +126,13 @@ reg I031a, oldkb;
 always @(posedge clk_sys) begin
   oldkb <= kb_down;
   if (reset | (~KB_MSK_n & ~rd_n)) I031a <= 1'b1;
-  else if (!oldkb & kb_down) I031a <= 1'b0;
-  else I031a <= 1'b1;
+  else if (oldkb ^ kb_down) I031a <= ~kb_down;
 end
 
 reg I031b; // kb int mask
 always @(posedge clk_sys) begin
   if (reset) I031b <= 1'b1;
+//else if (~wr_n & ~KB_MSK_n) I031b <= cpu_dout[0];
   else if (~wr_n & ~KB_MSK_n) I031b <= cpu_dout[0];
 end
 
