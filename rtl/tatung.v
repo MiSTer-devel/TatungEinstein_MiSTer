@@ -266,7 +266,7 @@ wire vram_we;
 wire [13:0] vram_addr;
 wire [7:0] vram_din, vram_dout;
 
-// 16k
+// 16k for TC01, 32x6 for 256
 ram #(.ADDRWIDTH(14), .DATAWIDTH(8)) vram(
   .clk(clk_sys),
   .addr(vram_addr),

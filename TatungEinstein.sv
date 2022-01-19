@@ -179,7 +179,7 @@ assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
 assign {SDRAM_DQ, SDRAM_A, SDRAM_BA, SDRAM_CLK, SDRAM_CKE, SDRAM_DQML, SDRAM_DQMH, SDRAM_nWE, SDRAM_nCAS, SDRAM_nRAS, SDRAM_nCS} = 'Z;
 assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = '0;  
 
-assign VGA_SL = 0;
+// assign VGA_SL = 0;
 assign VGA_F1 = 0;
 assign VGA_SCALER = 0;
 assign HDMI_FREEZE = 0;
@@ -197,9 +197,14 @@ assign BUTTONS = 0;
 //////////////////////////////////////////////////////////////////
 
 wire [1:0] ar = status[9:8];
+wire [2:0] scale = status[5:3];
+wire [2:0] sl = scale ? scale - 1'd1 : 3'd0;
+wire scandoubler = (scale || forced_scandoubler);
+wire freeze_sync;
 
 assign VIDEO_ARX = (!ar) ? 12'd4 : (ar - 1'd1);
 assign VIDEO_ARY = (!ar) ? 12'd3 : 12'd0;
+assign VGA_SL = sl[1:0];
 
 `include "build_id.v" 
 localparam CONF_STR = {
@@ -207,9 +212,10 @@ localparam CONF_STR = {
 	"S0,DSK,Mount Disk 0:;",
  	//"S1,DSK,Mount Disk 1:;",
 	"-;",
-	"H0O89,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
+	"O89,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
+	"O35,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
 	"-;",
-	"O5,Joystick,Digital,Analog;",
+	"O2,Joystick,Digital,Analog;",
 	"O6,Diagnostic ROM mounted,Off,On;",
 	"O7,Border,Off,On;",
 	"-;",
@@ -218,6 +224,8 @@ localparam CONF_STR = {
 	"V,v",`BUILD_DATE 
 };
 
+wire        direct_video;
+wire [21:0] gamma_bus;
 wire forced_scandoubler;
 wire  [1:0] buttons;
 wire [31:0] status;
@@ -247,6 +255,8 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 	.gamma_bus(),
 
 	.forced_scandoubler(forced_scandoubler),
+	.gamma_bus(gamma_bus),
+	.direct_video(direct_video),
 
 	.buttons(buttons),
 	.status(status),
@@ -278,12 +288,14 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 
 wire clk_sys;
 wire clk_vdp;
+wire clk_vid;
 pll pll
 (
 	.refclk(CLK_50M),
 	.rst(0),
 	.outclk_0(clk_sys), // 32
-	.outclk_1(clk_vdp)  // 10
+	.outclk_1(clk_vdp), // 10
+	.outclk_2(clk_vid) // 40
 );
 
 wire reset = RESET | status[0] | buttons[1];
@@ -323,13 +335,13 @@ tatung tatung
 	.clk_fdc(clk_fdc),
 	.reset(reset),
 
-	.vga_red(VGA_R),
-	.vga_green(VGA_G),
-	.vga_blue(VGA_B),
-	.vga_hblank(HBlank),
-	.vga_vblank(VBlank),
-	.vga_hsync(VGA_HS),
-	.vga_vsync(VGA_VS),
+	.vga_red(vga_red),
+	.vga_green(vga_green),
+	.vga_blue(vga_blue),
+	.vga_hblank(vga_hblank),
+	.vga_vblank(vga_vblank),
+	.vga_hsync(vga_hsync),
+	.vga_vsync(vga_vsync),
 	
 	.sound(sound),
 	
@@ -360,18 +372,38 @@ tatung tatung
 
 	.diagnostic(status[6]),
 	.border(status[7]),
-	.analog(status[5])
+	.analog(status[2])
 );
 
-wire HBlank;
-wire VBlank;
+wire [7:0] vga_red, vga_green, vga_blue;
+wire vga_hsync, vga_vsync;
+wire vga_hblank, vga_vblank;
 
-assign CLK_VIDEO = clk_vdp;
-assign CE_PIXEL = ce_pix;
-assign VGA_DE = ~(HBlank|VBlank);
+assign CLK_VIDEO = clk_vid;
+wire ce_pix = pxcnt[2];
+reg [2:0] pxcnt;
 
-reg ce_pix;
-always @(posedge clk_vdp)
-	ce_pix <= ~ce_pix;
+always @(posedge clk_vid)
+	pxcnt <= pxcnt + 3'd1;
+
+video_mixer #(.GAMMA(1), .LINE_LENGTH(256)) video_mixer
+(
+   .*,
+
+   .CLK_VIDEO(clk_vid),
+   .ce_pix(ce_pix),
+
+   .hq2x(scale==1),
+
+   .R(vga_red),
+   .G(vga_green),
+   .B(vga_blue),
+
+   .HSync(vga_hsync),
+   .VSync(vga_vsync),
+   .HBlank(vga_hblank),
+   .VBlank(vga_vblank)
+);
+
 
 endmodule
