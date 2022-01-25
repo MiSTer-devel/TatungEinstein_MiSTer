@@ -4,6 +4,7 @@ module tatung(
   input clk_cpu, // 4
   input clk_vdp, // 10
   input clk_fdc, // cen 4
+  input clk_vdp9938, // 20
   input reset,
 
   output [7:0] vga_red,
@@ -43,7 +44,9 @@ module tatung(
 
   input diagnostic,
   input border,
-  input analog
+  input analog,
+  input m256,
+  input scandoubler
 
 );
 
@@ -59,6 +62,11 @@ wire io_en = ~iorq_n & m1_n;
 wire rom_en = ~io_en && cpu_addr < 16'h8000 && ~I025a && ~rd_n;
 wire ram_en = ~io_en;
 
+// DISP for the 256
+// TODO: move to OSD
+// English 00 _ printer parallel 0 _ 525 lines 60Hz 0
+reg [3:0] DIPS = 4'b00_0_0;
+
 // CPU data bus
 
 wire [7:0] cpu_din =
@@ -68,6 +76,7 @@ wire [7:0] cpu_din =
   ~KB_MSK_n & ~rd_n ? { kb_shift, kb_ctrl, kb_graph, 3'b100, ~joystick_1[4], ~joystick_0[4] } : // todo: add I036 (printer/fire)
   ~FDC_n & ~rd_n ? fdc_dout :
   ~ADC_n & ~rd_n ? adc_dout :
+  ~MB_n & ~rd_n & m256 ? { 2'b01, DIPS, ~I025a, I025b } : // system status
   ctc_doe ? ctc_dout :
   rom_a ? rom_a_dout :
   rom_b ? rom_b_dout :
@@ -96,7 +105,7 @@ always @(posedge clk_sys) begin
 end
 
 T7475 T7475(
-  .d({ 1'b1, adc_int_n, fire_int_n, kb_int_n }),
+  .d({ m256 ? vdp_int_n : 1'b1, adc_int_n, fire_int_n, kb_int_n }),
   .en(I054c),
   .q(T75q)
 );
@@ -166,6 +175,21 @@ always @(posedge clk_sys) begin
   end
 end
 
+// vdp interrupt for 256
+
+reg vdp_int_n = 1;
+reg vdp_int_mask = 1;
+always @(posedge clk_sys) begin
+  vdp_int_n <= (v9938_int_n | vdp_int_mask);
+  if (reset) begin
+    vdp_int_mask <= 1'b1;
+    vdp_int_n <= 1'b1;
+  end
+  else if (~wr_n & ~JR_n) begin
+    vdp_int_mask <= cpu_dout[0];
+  end
+end
+
 
 // 2M clock & enable
 
@@ -201,7 +225,7 @@ t80s t80s(
 // I/O enables
 
 wire ADC_n, PIO, CTC_n, I026_Y4, FDC_n, PCI, VDP_n, PSG_n;
-wire JR, MB, FIREINT_MSK_n, ROM_n, DRSEL_n, APH, ADC_MSK_n, KB_MSK_n;
+wire JR_n, MB_n, FIREINT_MSK_n, ROM_n, DRSEL_n, APH, ADC_MSK_n, KB_MSK_n;
 
 x74138 I026(
   .G1(~(iorq_n|~m1_n)),
@@ -216,7 +240,7 @@ x74138 I027(
   .G2A(I026_Y4),
   .G2B(1'b0),
   .A(cpu_addr[2:0]),
-  .Y({ JR, MB, FIREINT_MSK_n, ROM_n, DRSEL_n, APH, ADC_MSK_n, KB_MSK_n })
+  .Y({ JR_n, MB_n, FIREINT_MSK_n, ROM_n, DRSEL_n, APH, ADC_MSK_n, KB_MSK_n })
 );
 
 // ROM status toggler
@@ -228,11 +252,20 @@ always @(posedge ROM_n, posedge reset)
   else
     I025a <= ~I025a;
 
+// ALPHA
+
+reg I025b;
+always @(posedge ROM_n, posedge reset)
+  if (reset)
+    I025b <= 1'b0;
+  else
+    I025b <= ~I025b;
 
 // Memories
 
-   
-wire [7:0] rom_a_dout, rom_b_dout;
+wire [7:0] rom01, rom256;
+wire [7:0] rom_a_dout = m256 ? rom256 : rom01;
+wire [7:0] rom_b_dout;
 
 wire rom_a = rom_en && ~I025a && ~cpu_addr[14];
 wire rom_b = rom_en && ~I025a && cpu_addr[14] && diagnostic;
@@ -241,7 +274,14 @@ rom #(.ROMFILE("roms/rom.mem"), .SIZE(16383)) I023(
   .clk(clk_sys),
   .cs(~rom_a),
   .addr(cpu_addr[13:0]),
-  .q(rom_a_dout)
+  .q(rom01)
+);
+
+rom #(.ROMFILE("roms/rom2.mem"), .SIZE(16383)) I008(
+  .clk(clk_sys),
+  .cs(~rom_a),
+  .addr(cpu_addr[13:0]),
+  .q(rom256)
 );
 
 rom #(.ROMFILE("roms/diagnostic.mem"), .SIZE(1625)) I024(
@@ -262,24 +302,58 @@ ram #(.ADDRWIDTH(16), .DATAWIDTH(8)) ram(
   .ce_n(~ram_en)
 );
 
-wire vram_we;
-wire [13:0] vram_addr;
-wire [7:0] vram_din, vram_dout;
+wire [13:0] vdp18_vram_addr;
+wire [16:0] v9938_vram_addr;
+wire vdp18_vram_we;
+wire v9938_vram_we_n;
+wire [7:0] vdp18_vram_din;
+wire [7:0] v9938_vram_din;
+wire v9938_vram_oe_n;
 
-// 16k for TC01, 32x6 for 256
-ram #(.ADDRWIDTH(14), .DATAWIDTH(8)) vram(
+wire [16:0] vram_addr = m256 ? v9938_vram_addr : { 3'd0, vdp18_vram_addr[13:0] };
+wire [7:0] vram_din = m256 ? v9938_vram_din : vdp18_vram_din;
+wire [7:0] vram_dout;
+wire vram_we = m256 ? v9938_vram_we_n : ~vdp18_vram_we;
+wire vram_ce_n = m256 ? v9938_vram_oe_n : 1'b0;
+
+wire [7:0] vdp18_vga_red;
+wire [7:0] vdp18_vga_green;
+wire [7:0] vdp18_vga_blue;
+wire [5:0] v9938_vga_red;
+wire [5:0] v9938_vga_green;
+wire [5:0] v9938_vga_blue;
+wire v9938_vga_hsync;
+wire v9938_vga_vsync;
+wire vdp18_vga_hsync;
+wire vdp18_vga_vsync;
+wire vdp18_vga_hblank;
+wire vdp18_vga_vblank;
+wire v9938_int_n;
+
+assign vga_red = m256 ? { v9938_vga_red, 2'd0 } : vdp18_vga_red;
+assign vga_green = m256 ? { v9938_vga_green, 2'd0 } : vdp18_vga_green;
+assign vga_blue = m256 ? { v9938_vga_blue, 2'd0 } : vdp18_vga_blue;
+assign vga_hsync = m256 ? v9938_vga_hsync : vdp18_vga_hsync;
+assign vga_vsync = m256 ? v9938_vga_vsync : vdp18_vga_vsync;
+assign vga_hblank = m256 ? 1'b0 : vdp18_vga_hblank;
+assign vga_vblank = m256 ? 1'b0 : vdp18_vga_vblank;
+
+// 16k only for TC01, 128k for TSC256
+ram #(.ADDRWIDTH(17), .DATAWIDTH(8)) vram(
   .clk(clk_sys),
   .addr(vram_addr),
   .din(vram_din),
   .q(vram_dout),
-  .wr_n(~vram_we),
+  .wr_n(vram_we),
   .ce_n(1'b0)
 );
 
+wire [7:0] vdp18_dout;
+wire [7:0] v9938_dout;
+wire [7:0] vdp_dout = m256 ? v9938_dout : vdp18_dout;
 
-// VDP
 
-wire [7:0] vdp_dout;
+// VDP #1 (TC01)
 
 vdp18_core vdp18(
   .clk_i(clk_vdp),
@@ -291,26 +365,64 @@ vdp18_core vdp18(
   .mode_i(cpu_addr[0]),
   .int_n_o(),
   .cd_i(cpu_dout),
-  .cd_o(vdp_dout),
+  .cd_o(vdp18_dout),
 
-  .vram_we_o(vram_we),
-  .vram_a_o(vram_addr),
-  .vram_d_o(vram_din),
+  .vram_we_o(vdp18_vram_we),
+  .vram_a_o(vdp18_vram_addr),
+  .vram_d_o(vdp18_vram_din),
   .vram_d_i(vram_dout),
 
   .border_i(border),
   .col_o(),
-  .rgb_r_o(vga_red),
-  .rgb_g_o(vga_green),
-  .rgb_b_o(vga_blue),
-  .hsync_n_o(vga_hsync),
-  .vsync_n_o(vga_vsync),
+  .rgb_r_o(vdp18_vga_red),
+  .rgb_g_o(vdp18_vga_green),
+  .rgb_b_o(vdp18_vga_blue),
+  .hsync_n_o(vdp18_vga_hsync),
+  .vsync_n_o(vdp18_vga_vsync),
   .blank_n_o(),
-  .hblank_o(vga_hblank),
-  .vblank_o(vga_vblank),
+  .hblank_o(vdp18_vga_hblank),
+  .vblank_o(vdp18_vga_vblank),
   .comp_sync_n_o()
 );
 
+// VDP #2 (256)
+
+VDP vdp9938(
+  .CLK21M(clk_vdp9938),
+  .RESET(reset),
+  .REQ(~VDP_n),
+  .ACK(),
+  .WRT(~VDP_n & ~wr_n),
+  .ADR(cpu_addr),
+  .DBI(v9938_dout),
+  .DBO(cpu_dout),
+  .INT_N(v9938_int_n),
+  
+  .PRAMOE_N(v9938_vram_oe_n),
+  .PRAMWE_N(v9938_vram_we_n),
+  .PRAMADR(v9938_vram_addr),
+  .PRAMDBI(vram_dout),
+  .PRAMDBO(v9938_vram_din),
+  
+  .VDPSPEEDMODE(0),
+  .RATIOMODE(),
+  .CENTERYJK_R25_N(),
+  
+  .PVIDEOR(v9938_vga_red),
+  .PVIDEOG(v9938_vga_green),
+  .PVIDEOB(v9938_vga_blue),
+  .PVIDEODE(),
+  .PVIDEOHS_N(v9938_vga_hsync),
+  .PVIDEOVS_N(v9938_vga_vsync),
+  .PVIDEOCS_N(),
+  .PVIDEODHCLK(),
+  .PVIDEODLCLK(),
+  
+  .DISPRESO(scandoubler),
+  .NTSC_PAL_TYPE(),
+  .FORCED_V_MODE(),
+  .LEGACY_VGA(1)
+);
 
 // AUDIO
 
