@@ -3,7 +3,7 @@ module rom #(
   parameter ROMFILE = "rom", SIZE = 8191
 ) (
   input clk,
-  input [12:0] addr,
+  input [13:0] addr,
   output reg [7:0] q,
   input cs
 );
