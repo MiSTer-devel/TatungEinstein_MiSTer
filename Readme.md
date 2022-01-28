@@ -1,7 +1,7 @@
 Tatung Einstein for MiSTer FPGA
 ===============================
 
-This is the port of the Tatung Einstein TC01 for MiSTer FPGA by Pierco (Pierre Cornier).
+This is the port of the Tatung Einstein TC01 & 256 for MiSTer FPGA by Pierco (Pierre Cornier).
 
 
 Insert a DSK file then press CTRL+TAB to load it. Use the `DIR` command to list the files if it's not a bootable disk. If you want to run a COM file, just type the name without the extension and press the [ENTER] key. For XBS basic files, you will need to load the XBasic first (insert the disk and type `XBAS`), then load your XBS file with `LOAD "filename"` and type `RUN`.
