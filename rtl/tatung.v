@@ -141,7 +141,6 @@ end
 reg I031b; // kb int mask
 always @(posedge clk_sys) begin
   if (reset) I031b <= 1'b1;
-//else if (~wr_n & ~KB_MSK_n) I031b <= cpu_dout[0];
   else if (~wr_n & ~KB_MSK_n) I031b <= cpu_dout[0];
 end
 
@@ -324,25 +323,28 @@ wire [5:0] v9938_vga_green;
 wire [5:0] v9938_vga_blue;
 wire v9938_vga_hsync;
 wire v9938_vga_vsync;
+wire v9938_vga_hblank;
+wire v9938_vga_vblank;
 wire vdp18_vga_hsync;
 wire vdp18_vga_vsync;
 wire vdp18_vga_hblank;
 wire vdp18_vga_vblank;
 wire v9938_int_n;
+wire v9938_vdlclk;
 
 assign vga_red = m256 ? { v9938_vga_red, 2'd0 } : vdp18_vga_red;
 assign vga_green = m256 ? { v9938_vga_green, 2'd0 } : vdp18_vga_green;
 assign vga_blue = m256 ? { v9938_vga_blue, 2'd0 } : vdp18_vga_blue;
 assign vga_hsync = m256 ? v9938_vga_hsync : vdp18_vga_hsync;
 assign vga_vsync = m256 ? v9938_vga_vsync : vdp18_vga_vsync;
-assign vga_hblank = m256 ? 1'b0 : vdp18_vga_hblank;
-assign vga_vblank = m256 ? 1'b0 : vdp18_vga_vblank;
+assign vga_hblank = m256 ? v9938_vga_hblank : vdp18_vga_hblank;
+assign vga_vblank = m256 ? v9938_vga_vblank : vdp18_vga_vblank;
 
 // 16k only for TC01, 128k for TSC256
-ram #(.ADDRWIDTH(17), .DATAWIDTH(8)) vram(
+ram #(.ADDRWIDTH(17), .DATAWIDTH(16)) vram(
   .clk(clk_sys),
   .addr(vram_addr),
-  .din(vram_din),
+  .din({ vram_din, vram_din }),
   .q(vram_dout),
   .wr_n(vram_we),
   .ce_n(1'b0)
@@ -387,12 +389,30 @@ vdp18_core vdp18(
 
 // VDP #2 (256)
 
+wire pdlclk;
+reg v9938_req;
+reg old_vdp_n;
+wire v9938_ack;
+reg v9938_cpu_wr;
+
+always @(posedge clk_sys) begin
+  old_vdp_n <= VDP_n;
+  if (old_vdp_n & ~VDP_n) begin
+    v9938_req <= 1'b1;
+    if (~wr_n) v9938_cpu_wr <= 1'b1;
+  end
+  if (v9938_ack) begin
+    v9938_req <= 1'b0;
+    v9938_cpu_wr <= 1'b0;
+  end
+end
+
 VDP vdp9938(
   .CLK21M(clk_vdp9938),
   .RESET(reset),
-  .REQ(~VDP_n),
-  .ACK(),
-  .WRT(~VDP_n & ~wr_n),
+  .REQ(v9938_req),
+  .ACK(v9938_ack),
+  .WRT(v9938_cpu_wr),
   .ADR(cpu_addr),
   .DBI(v9938_dout),
   .DBO(cpu_dout),
@@ -401,7 +421,7 @@ VDP vdp9938(
   .PRAMOE_N(v9938_vram_oe_n),
   .PRAMWE_N(v9938_vram_we_n),
   .PRAMADR(v9938_vram_addr),
-  .PRAMDBI(vram_dout),
+  .PRAMDBI(~v9938_vram_oe_n ? vram_dout : 8'd0),
   .PRAMDBO(v9938_vram_din),
   
   .VDPSPEEDMODE(0),
@@ -414,9 +434,11 @@ VDP vdp9938(
   .PVIDEODE(),
   .PVIDEOHS_N(v9938_vga_hsync),
   .PVIDEOVS_N(v9938_vga_vsync),
+  .PVIDEOHB(v9938_vga_hblank),
+  .PVIDEOVB(v9938_vga_vblank),
   .PVIDEOCS_N(),
   .PVIDEODHCLK(),
-  .PVIDEODLCLK(),
+  .PVIDEODLCLK(v9938_vdlclk),
   
   .DISPRESO(scandoubler),
   .NTSC_PAL_TYPE(),
