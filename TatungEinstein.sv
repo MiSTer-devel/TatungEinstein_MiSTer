@@ -214,6 +214,8 @@ localparam CONF_STR = {
 	"O89,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"O35,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
 	"-;",
+	"OA,Einstein Version,TC01,256;",
+	"-;",
 	"O2,Joystick,Digital,Analog;",
 	"O6,Diagnostic ROM mounted,Off,On;",
 	"O7,Border,Off,On;",
@@ -293,11 +295,14 @@ pll pll
 	.refclk(CLK_50M),
 	.rst(0),
 	.outclk_0(clk_sys), // 32
-	.outclk_1(clk_vdp), // 10
-	.outclk_2(clk_vid) // 40
+	.outclk_1(clk_vdp), // 10.6
+	.outclk_2(clk_vid)  // 42.6
 );
 
-wire reset = RESET | status[0] | buttons[1];
+reg old_mode;
+always @(posedge clk_sys) old_mode <= status[10];
+
+wire reset = RESET | status[0] | buttons[1] | (old_mode^status[10]);
 
 reg [2:0] clk_div;
 wire clk_cpu = clk_div[2]; // 4M
@@ -332,6 +337,7 @@ tatung tatung
 	.clk_vdp(clk_vdp),
 	.clk_cpu(clk_cpu),
 	.clk_fdc(clk_fdc),
+	.clk_vdp9938(clk_vdp9938),
 	.reset(reset),
 
 	.vga_red(vga_red),
@@ -367,11 +373,13 @@ tatung tatung
 	.joystick_0(joystick_0),
 	.joystick_1(joystick_1),
 	.joystick_analog_0(joystick_analog_0),
-   	.joystick_analog_1(joystick_analog_1),
+   .joystick_analog_1(joystick_analog_1),
 
 	.diagnostic(status[6]),
 	.border(status[7]),
-	.analog(status[2])
+	.analog(status[2]),
+	.m256(status[10]),
+	.scandoubler(scandoubler)
 );
 
 wire [7:0] vga_red, vga_green, vga_blue;
@@ -381,9 +389,12 @@ wire vga_hblank, vga_vblank;
 assign CLK_VIDEO = clk_vid;
 wire ce_pix = pxcnt[2];
 reg [2:0] pxcnt;
+reg clk_vdp9938;
 
-always @(posedge clk_vid)
+always @(posedge clk_vid) begin
+	clk_vdp9938 <= ~clk_vdp9938;
 	pxcnt <= pxcnt + 3'd1;
+end
 
 video_mixer #(.GAMMA(1), .LINE_LENGTH(256)) video_mixer
 (
